@@ -4,7 +4,7 @@ An interactive 3D web experience that teaches the physical anatomy of payment ca
 
 Built with Three.js (WebGL). The card is real extruded geometry with layered meshes, not an image or a CSS transform.
 
-**Live demo:** https://YOUR-USERNAME.github.io/cardlab/
+Live demo: https://khatrisushant.github.io/3D-Card-Learning/
 
 ## Features
 
