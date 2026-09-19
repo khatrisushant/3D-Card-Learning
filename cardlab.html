@@ -1,0 +1,2122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+<title>CardLab — Understand Your Card</title>
+<meta name="description" content="An interactive 3D lab for learning the physical parts of credit and debit cards. Educational demonstration with fictional card data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#04060B;
+  --ink-2:#080C15;
+  --haze:#111A2B;
+  --cyan:#5FE3FF;
+  --violet:#8F7BFF;
+  --gold:#E8C878;
+  --text:#EAF0FA;
+  --muted:#93A2BC;
+  --line:rgba(255,255,255,.10);
+  --glass:rgba(16,24,40,.55);
+  --glass-2:rgba(12,18,32,.78);
+  --radius:18px;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --display:'Space Grotesk','Inter',system-ui,sans-serif;
+}
+:root:not([data-theme="light"]){color-scheme:dark;}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(900px 600px at 18% 12%, rgba(95,227,255,.14), transparent 62%),
+    radial-gradient(800px 620px at 84% 78%, rgba(143,123,255,.16), transparent 64%),
+    radial-gradient(1200px 800px at 50% 110%, rgba(20,36,64,.55), transparent 70%),
+    linear-gradient(180deg,#04060B 0%,#060A13 50%,#04060B 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;
+  background-image:radial-gradient(rgba(255,255,255,.055) 1px, transparent 1px);
+  background-size:3px 3px;mix-blend-mode:overlay;
+}
+button,input,select{font:inherit;color:inherit;}
+button{cursor:pointer;}
+a{color:var(--cyan);}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:10px;}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+
+/* ---------- glass ---------- */
+.glass{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  backdrop-filter:blur(22px) saturate(160%);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 18px 50px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+}
+
+/* ---------- loader ---------- */
+#loader{
+  position:fixed;inset:0;z-index:200;display:grid;place-items:center;
+  background:linear-gradient(180deg,#04060B,#070B14);transition:opacity .7s ease,visibility .7s;
+}
+#loader.done{opacity:0;visibility:hidden;}
+.load-inner{text-align:center;width:min(320px,80vw);}
+.load-mark{font-family:var(--display);font-weight:700;letter-spacing:.34em;font-size:15px;color:var(--text);}
+.load-bar{margin-top:20px;height:2px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;}
+.load-fill{height:100%;width:8%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .35s ease;}
+.load-note{margin-top:14px;font-size:12px;color:var(--muted);}
+
+/* ---------- nav ---------- */
+header.nav{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  display:flex;align-items:center;gap:18px;
+  padding:14px clamp(14px,3vw,30px);
+  background:linear-gradient(180deg,rgba(4,6,11,.86),rgba(4,6,11,0));
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.brand{font-family:var(--display);font-weight:700;letter-spacing:.22em;font-size:14px;}
+.brand span{color:var(--cyan);}
+.nav-links{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;}
+.nav-links button{
+  background:transparent;border:1px solid transparent;border-radius:999px;
+  padding:8px 13px;font-size:13px;color:var(--muted);transition:.22s;
+}
+.nav-links button:hover{color:var(--text);background:rgba(255,255,255,.06);}
+.nav-links button[aria-current="page"]{color:var(--text);border-color:rgba(95,227,255,.45);background:rgba(95,227,255,.10);}
+@media(max-width:860px){ .nav-links button{padding:7px 10px;font-size:12px;} .brand{font-size:12px;} }
+
+/* ---------- stage ---------- */
+#stage{position:fixed;inset:0;z-index:1;transition:opacity .5s ease;}
+#stage.hidden-stage{opacity:0;pointer-events:none;}
+#gl{display:block;width:100%;height:100%;touch-action:none;}
+#hotspots{position:fixed;inset:0;z-index:22;pointer-events:none;}
+
+/* hotspots */
+.hs{
+  position:absolute;transform:translate(-50%,-50%);pointer-events:auto;
+  display:flex;align-items:center;gap:8px;
+  background:rgba(8,14,26,.62);border:1px solid rgba(255,255,255,.16);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-radius:999px;padding:5px 5px;color:var(--text);
+  transition:background .2s,border-color .2s,box-shadow .2s,opacity .25s;
+  white-space:nowrap;font-size:12px;
+}
+.hs .dot{
+  width:14px;height:14px;border-radius:50%;flex:none;position:relative;
+  background:radial-gradient(circle at 35% 35%, #fff, var(--cyan) 62%, rgba(95,227,255,.2));
+  box-shadow:0 0 0 4px rgba(95,227,255,.14);
+}
+.hs .dot::after{
+  content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid rgba(95,227,255,.6);
+  animation:pulse 2.6s ease-out infinite;
+}
+@keyframes pulse{0%{transform:scale(.6);opacity:.9}70%{transform:scale(1.9);opacity:0}100%{opacity:0}}
+.hs .lbl{max-width:0;overflow:hidden;opacity:0;transition:max-width .32s ease,opacity .25s ease,padding .3s;padding-right:0;}
+.hs:hover,.hs:focus-visible,.hs.on{background:rgba(95,227,255,.16);border-color:rgba(95,227,255,.6);box-shadow:0 8px 28px rgba(95,227,255,.22);}
+.hs:hover .lbl,.hs:focus-visible .lbl,.hs.on .lbl{max-width:220px;opacity:1;padding-right:8px;}
+.hs .lbl b{font-weight:600;}
+.hs .lbl i{display:block;font-style:normal;font-size:10px;color:var(--cyan);letter-spacing:.06em;}
+.hs.quiz .dot{background:radial-gradient(circle at 35% 35%,#fff,var(--violet) 62%,rgba(143,123,255,.2));box-shadow:0 0 0 4px rgba(143,123,255,.16);}
+.hs.faded{opacity:0;pointer-events:none;}
+@media(prefers-reduced-motion:reduce){.hs .dot::after{animation:none;}}
+
+/* ---------- screens ---------- */
+.screen{position:relative;z-index:20;display:none;}
+.screen.active{display:block;}
+.wrap{width:min(1120px,92vw);margin:0 auto;}
+
+/* hero */
+#home{min-height:100svh;display:none;}
+#home.active{display:grid;pointer-events:none;}
+.hero{
+  min-height:100svh;display:grid;grid-template-rows:1fr auto;
+  padding:110px 0 28px;pointer-events:none;
+}
+.hero-top{display:grid;justify-items:center;align-content:start;text-align:center;}
+.eyebrow{
+  pointer-events:auto;display:inline-flex;align-items:center;gap:9px;font-size:11.5px;color:var(--muted);
+  border:1px solid var(--line);border-radius:999px;padding:6px 14px;background:rgba(10,16,28,.5);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.eyebrow .led{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);}
+h1.title{
+  font-family:var(--display);font-weight:700;margin:20px 0 0;
+  font-size:clamp(46px,12vw,124px);line-height:.88;letter-spacing:-.045em;
+  background:linear-gradient(180deg,#FFFFFF 18%,#9FB3D4 92%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.tag{font-family:var(--display);font-size:clamp(17px,2.4vw,26px);margin:14px 0 0;color:var(--text);font-weight:500;}
+.sub{margin:10px auto 0;max-width:46ch;color:var(--muted);font-size:clamp(13px,1.5vw,15.5px);line-height:1.6;}
+.hero-bottom{display:grid;justify-items:center;gap:16px;}
+.hint{
+  pointer-events:auto;font-size:12px;color:var(--muted);letter-spacing:.04em;
+  background:rgba(8,12,22,.55);border:1px solid var(--line);border-radius:999px;padding:7px 16px;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.cta-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;pointer-events:auto;}
+.btn{
+  border:1px solid var(--line);background:rgba(16,24,40,.6);color:var(--text);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-radius:999px;padding:12px 22px;font-size:14px;font-weight:500;
+  transition:transform .18s ease,background .2s,border-color .2s,box-shadow .2s;
+}
+.btn:hover{transform:translateY(-2px);background:rgba(28,40,64,.72);border-color:rgba(255,255,255,.22);}
+.btn:active{transform:translateY(0);}
+.btn.primary{
+  background:linear-gradient(135deg,rgba(95,227,255,.92),rgba(143,123,255,.92));
+  color:#04060B;border-color:transparent;font-weight:600;
+  box-shadow:0 12px 34px rgba(95,227,255,.28);
+}
+.btn.primary:hover{box-shadow:0 16px 40px rgba(143,123,255,.36);}
+.btn.small{padding:9px 15px;font-size:12.5px;}
+.btn[aria-pressed="true"]{border-color:rgba(95,227,255,.7);background:rgba(95,227,255,.16);color:#fff;}
+.btn:disabled{opacity:.42;cursor:not-allowed;transform:none;}
+@media(prefers-reduced-motion:reduce){.btn:hover{transform:none;}}
+
+/* lab overlay */
+#lab{position:fixed;inset:0;z-index:20;display:none;pointer-events:none;}
+#lab.active{display:block;}
+.lab-head{
+  position:absolute;top:74px;left:50%;transform:translateX(-50%);
+  pointer-events:auto;text-align:center;
+}
+.lab-head h2{font-family:var(--display);font-size:20px;margin:0;letter-spacing:-.01em;}
+.lab-head p{margin:5px 0 0;font-size:12px;color:var(--muted);}
+.toolbar{
+  position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+  pointer-events:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;
+  padding:8px;max-width:94vw;
+}
+.tool{
+  border:1px solid transparent;background:transparent;border-radius:12px;
+  padding:9px 13px;font-size:12.5px;color:var(--muted);transition:.2s;display:flex;align-items:center;gap:7px;
+}
+.tool:hover{color:var(--text);background:rgba(255,255,255,.07);}
+.tool[aria-pressed="true"]{color:#04060B;background:linear-gradient(135deg,var(--cyan),var(--violet));font-weight:600;}
+.tool svg{width:15px;height:15px;}
+.side-switch{
+  position:absolute;top:50%;right:clamp(12px,2.5vw,26px);transform:translateY(-50%);
+  pointer-events:auto;display:grid;gap:6px;padding:8px;
+}
+.side-switch button{
+  border:1px solid transparent;background:transparent;color:var(--muted);
+  border-radius:10px;padding:9px 11px;font-size:11.5px;transition:.2s;text-align:left;min-width:104px;
+}
+.side-switch button:hover{background:rgba(255,255,255,.07);color:var(--text);}
+.side-switch button[aria-pressed="true"]{background:rgba(95,227,255,.14);color:#fff;border-color:rgba(95,227,255,.4);}
+@media(max-width:820px){
+  .side-switch{top:auto;bottom:96px;right:50%;transform:translateX(50%);grid-auto-flow:column;}
+  .side-switch button{min-width:0;padding:8px 10px;}
+  .lab-head{top:66px;width:92vw;}
+}
+
+/* info panel */
+#panel{
+  position:fixed;z-index:40;top:0;right:0;height:100svh;width:min(430px,92vw);
+  transform:translateX(105%);transition:transform .5s cubic-bezier(.22,1,.36,1);
+  display:flex;flex-direction:column;border-radius:0;border-right:0;border-top:0;border-bottom:0;
+  background:var(--glass-2);
+}
+#panel.open{transform:none;}
+.panel-scroll{overflow-y:auto;padding:26px 26px 12px;flex:1;overscroll-behavior:contain;}
+.panel-kicker{font-size:11px;color:var(--cyan);letter-spacing:.14em;}
+#panel h3{font-family:var(--display);font-size:26px;margin:8px 0 4px;letter-spacing:-.02em;line-height:1.1;}
+.panel-side{font-size:12px;color:var(--muted);}
+.field{margin-top:20px;}
+.field h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--cyan);letter-spacing:.02em;}
+.field p{margin:0;font-size:14px;line-height:1.65;color:#D3DDEE;}
+.note{
+  margin-top:20px;border-left:2px solid var(--gold);padding:12px 14px;border-radius:0 12px 12px 0;
+  background:linear-gradient(90deg,rgba(232,200,120,.13),rgba(232,200,120,.03));
+  font-size:13px;line-height:1.6;color:#F0E4C4;
+}
+.note strong{color:var(--gold);}
+.panel-foot{display:flex;gap:8px;padding:14px 20px 20px;border-top:1px solid var(--line);}
+.panel-foot .btn{flex:1;text-align:center;padding:11px 10px;font-size:13px;}
+@media(max-width:820px){
+  #panel{top:auto;bottom:0;right:0;left:0;height:min(72svh,640px);width:auto;
+    border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);}
+  #panel.open{transform:none;}
+  .panel-scroll{padding:8px 20px 8px;}
+  .grabber{width:44px;height:4px;border-radius:99px;background:rgba(255,255,255,.22);margin:10px auto 0;flex:none;}
+}
+.grabber{display:none;}
+@media(max-width:820px){.grabber{display:block;}}
+
+/* tour bar */
+#tourbar{
+  position:fixed;z-index:38;left:50%;bottom:22px;transform:translate(-50%,160%);
+  transition:transform .5s cubic-bezier(.22,1,.36,1);
+  width:min(560px,92vw);padding:16px 18px;pointer-events:auto;
+}
+#tourbar.open{transform:translate(-50%,0);}
+.tour-meta{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);}
+.tour-meta b{font-family:var(--display);color:var(--cyan);letter-spacing:.1em;font-weight:600;}
+#tourbar h3{font-family:var(--display);font-size:19px;margin:6px 0 4px;}
+#tourbar p{margin:0;font-size:13px;color:#C2CFE4;line-height:1.55;}
+.tour-track{height:2px;background:rgba(255,255,255,.12);border-radius:2px;margin:14px 0 12px;overflow:hidden;}
+.tour-fill{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .5s ease;}
+.tour-btns{display:flex;gap:8px;}
+.tour-btns .btn{flex:1;padding:10px;font-size:13px;text-align:center;}
+@media(max-width:820px){#tourbar{bottom:14px;}}
+
+/* content sections */
+.section{padding:120px 0 90px;}
+.kicker{font-size:11.5px;color:var(--cyan);letter-spacing:.16em;}
+.section h2{font-family:var(--display);font-size:clamp(30px,5vw,50px);letter-spacing:-.035em;margin:12px 0 0;line-height:1.02;}
+.lede{color:var(--muted);max-width:60ch;margin:14px 0 0;line-height:1.7;font-size:15px;}
+.cards-grid{display:grid;gap:14px;margin-top:34px;}
+.pcard{padding:22px;}
+.pcard h3{font-family:var(--display);margin:0 0 8px;font-size:18px;}
+.pcard p{margin:0;color:#BFCBE0;font-size:14px;line-height:1.65;}
+.two{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+.three{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+
+/* compare */
+#compare .compare-stageinfo{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
+.chip-label{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+.swatch{width:26px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);}
+.ctable{width:100%;border-collapse:collapse;margin-top:26px;font-size:14px;}
+.ctable th,.ctable td{text-align:left;padding:14px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.6;}
+.ctable thead th{font-family:var(--display);font-size:13px;color:var(--cyan);letter-spacing:.04em;}
+.ctable td:first-child{color:var(--muted);width:20%;min-width:120px;}
+@media(max-width:700px){
+  .ctable,.ctable tbody,.ctable tr,.ctable td,.ctable thead{display:block;width:100%;}
+  .ctable thead{display:none;}
+  .ctable tr{border:1px solid var(--line);border-radius:14px;margin-bottom:12px;padding:6px 10px;}
+  .ctable td{border:0;padding:8px 4px;}
+  .ctable td:first-child{color:var(--cyan);font-size:12px;width:auto;padding-bottom:0;}
+  .ctable td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--muted);margin-bottom:3px;}
+}
+
+/* flow */
+.flow{display:grid;gap:0;margin-top:40px;position:relative;}
+.flow-line{position:absolute;left:23px;top:8px;bottom:8px;width:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;}
+.flow-pulse{position:absolute;left:-3px;width:8px;height:60px;border-radius:99px;
+  background:linear-gradient(180deg,transparent,var(--cyan),var(--violet),transparent);
+  filter:blur(1px);top:-70px;}
+.fnode{
+  display:grid;grid-template-columns:48px 1fr;gap:14px;align-items:center;
+  background:transparent;border:0;text-align:left;padding:11px 12px 11px 0;border-radius:14px;
+  transition:background .25s;width:100%;
+}
+.fnode:hover{background:rgba(255,255,255,.05);}
+.fnum{
+  width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--line);background:rgba(10,16,28,.8);font-family:var(--display);font-size:13px;
+  color:var(--muted);transition:.35s;
+}
+.fnode.lit .fnum{border-color:var(--cyan);color:#04060B;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 26px rgba(95,227,255,.4);}
+.fnode h3{margin:0;font-family:var(--display);font-size:16px;font-weight:500;}
+.fnode p{margin:3px 0 0;font-size:12.5px;color:var(--muted);}
+#flowInfo{margin-top:22px;padding:20px;display:none;}
+#flowInfo.show{display:block;}
+#flowInfo h3{font-family:var(--display);margin:0 0 8px;font-size:18px;}
+#flowInfo p{margin:0;color:#C6D2E6;line-height:1.7;font-size:14px;}
+
+/* security accordion */
+.acc{margin-top:28px;display:grid;gap:10px;}
+.acc-item{overflow:hidden;}
+.acc-btn{
+  width:100%;display:flex;align-items:center;gap:14px;background:transparent;border:0;
+  padding:18px 20px;text-align:left;font-family:var(--display);font-size:16px;
+}
+.acc-btn .plus{margin-left:auto;color:var(--cyan);font-size:20px;line-height:1;transition:transform .3s;}
+.acc-item.open .acc-btn .plus{transform:rotate(45deg);}
+.acc-body{max-height:0;transition:max-height .45s cubic-bezier(.22,1,.36,1);}
+.acc-item.open .acc-body{max-height:520px;}
+.acc-inner{padding:0 20px 20px;color:#C3CFE3;font-size:14px;line-height:1.7;}
+.acc-inner strong{color:var(--text);}
+
+/* quiz */
+#quizui{position:fixed;z-index:34;left:50%;bottom:22px;transform:translate(-50%,160%);
+  transition:transform .5s cubic-bezier(.22,1,.36,1);width:min(620px,92vw);padding:18px;pointer-events:auto;}
+#quizui.open{transform:translate(-50%,0);}
+.q-top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);letter-spacing:.08em;}
+#quizui h3{font-family:var(--display);font-size:18px;margin:8px 0 0;line-height:1.35;}
+.q-feedback{margin-top:12px;font-size:13.5px;line-height:1.6;min-height:20px;}
+.q-feedback.ok{color:#7BE8B6;}
+.q-feedback.no{color:#FFC98A;}
+.q-track{height:2px;background:rgba(255,255,255,.12);margin:14px 0 12px;border-radius:2px;overflow:hidden;}
+.q-fill{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .4s;}
+.q-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.q-btns .btn{flex:1;min-width:120px;text-align:center;padding:10px;font-size:13px;}
+
+/* text version */
+.part-list{display:grid;gap:12px;margin-top:30px;}
+details.part{padding:0;overflow:hidden;}
+details.part summary{
+  list-style:none;cursor:pointer;padding:16px 20px;font-family:var(--display);font-size:16px;
+  display:flex;align-items:center;gap:12px;
+}
+details.part summary::-webkit-details-marker{display:none;}
+details.part summary::after{content:"+";margin-left:auto;color:var(--cyan);font-size:19px;}
+details.part[open] summary::after{content:"–";}
+.part-body{padding:0 20px 20px;font-size:14px;line-height:1.7;color:#C3CFE3;}
+.part-body dt{color:var(--cyan);font-size:12px;font-weight:600;margin-top:14px;}
+.part-body dd{margin:4px 0 0;}
+.tagpill{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px;}
+
+/* fallback 2d */
+#fallback{display:none;padding:120px 0 80px;}
+#fallback.on{display:block;}
+.f2d{position:relative;aspect-ratio:1.586;width:min(620px,92vw);margin:30px auto 0;border-radius:20px;
+  background:linear-gradient(135deg,#16243E,#0B1220 55%,#1A1436);border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 30px 70px rgba(0,0,0,.6);overflow:hidden;}
+.f2d .fchip{position:absolute;left:9%;top:34%;width:14%;aspect-ratio:1.3;border-radius:7px;
+  background:linear-gradient(135deg,#F0DCA0,#B8933F);}
+.f2d .fnum{position:absolute;left:8%;top:62%;font-family:var(--display);font-size:clamp(14px,3.3vw,25px);letter-spacing:.09em;}
+.f2d .fname{position:absolute;left:8%;bottom:9%;font-size:clamp(9px,1.8vw,13px);letter-spacing:.14em;color:#CAD6EA;}
+.f2d .fbank{position:absolute;left:8%;top:11%;font-family:var(--display);letter-spacing:.2em;font-size:clamp(10px,2vw,15px);}
+.f2d button.fhs{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;
+  border:1px solid rgba(95,227,255,.7);background:rgba(95,227,255,.2);}
+footer.foot{padding:40px 0 60px;color:var(--muted);font-size:12px;line-height:1.7;position:relative;z-index:20;}
+footer.foot .wrap{border-top:1px solid var(--line);padding-top:24px;}
+.scrim{position:fixed;inset:0;z-index:30;background:rgba(2,4,8,.5);opacity:0;visibility:hidden;transition:.4s;}
+.scrim.on{opacity:1;visibility:visible;}
+@media(min-width:821px){.scrim{display:none;}}
+</style>
+</head>
+<body>
+
+<div id="loader" role="status" aria-live="polite">
+  <div class="load-inner">
+    <div class="load-mark">C A R D L A B</div>
+    <div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
+    <div class="load-note" id="loadNote">Building the card…</div>
+  </div>
+</div>
+
+<header class="nav">
+  <div class="brand">CARD<span>LAB</span></div>
+  <nav class="nav-links" aria-label="Main">
+    <button data-go="home">Home</button>
+    <button data-go="lab">Card lab</button>
+    <button data-go="compare">Credit vs debit</button>
+    <button data-go="flow">Payment flow</button>
+    <button data-go="security">Security</button>
+    <button data-go="quiz">Quiz</button>
+    <button data-go="text">Text version</button>
+  </nav>
+</header>
+
+<div id="stage" aria-hidden="true"><canvas id="gl"></canvas></div>
+<div id="hotspots"></div>
+<div class="scrim" id="scrim"></div>
+
+<!-- HOME -->
+<section class="screen" id="home" aria-label="Home">
+  <div class="hero wrap">
+    <div class="hero-top">
+      <span class="eyebrow"><span class="led"></span> Interactive 3D · fictional sample card</span>
+      <h1 class="title">CARDLAB</h1>
+      <p class="tag">Understand Your Card.</p>
+      <p class="sub">Explore every component of a payment card through an interactive 3D experience.</p>
+    </div>
+    <div class="hero-bottom">
+      <div class="hint">Drag to rotate &nbsp;•&nbsp; Scroll to zoom &nbsp;•&nbsp; Click to explore</div>
+      <div class="cta-row">
+        <button class="btn primary" data-act="explore-credit">Explore credit card</button>
+        <button class="btn" data-act="explore-debit">Explore debit card</button>
+        <button class="btn" data-act="tour">Guided tour</button>
+        <button class="btn" data-go="compare">Compare cards</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LAB OVERLAY -->
+<div id="lab">
+  <div class="lab-head">
+    <h2 id="labTitle">Credit card</h2>
+    <p id="labSub">Drag to rotate · scroll to zoom · click a marker to learn</p>
+  </div>
+
+  <div class="side-switch glass" role="group" aria-label="Card type and side">
+    <button data-card="credit" aria-pressed="true">Credit card</button>
+    <button data-card="debit" aria-pressed="false">Debit card</button>
+    <button data-side="front" aria-pressed="true">Front side</button>
+    <button data-side="back" aria-pressed="false">Back side</button>
+  </div>
+
+  <div class="toolbar glass" role="group" aria-label="3D controls">
+    <button class="tool" data-tool="spin" aria-pressed="false">Rotate</button>
+    <button class="tool" data-tool="zoomin">Zoom in</button>
+    <button class="tool" data-tool="zoomout">Zoom out</button>
+    <button class="tool" data-tool="flip">Flip card</button>
+    <button class="tool" data-tool="explode" aria-pressed="false">Exploded view</button>
+    <button class="tool" data-tool="xray" aria-pressed="false">X-ray</button>
+    <button class="tool" data-tool="reset">Reset</button>
+    <button class="tool" data-tool="tour">Guided tour</button>
+    <button class="tool" data-tool="full">Fullscreen</button>
+  </div>
+</div>
+
+<!-- INFO PANEL -->
+<aside id="panel" class="glass" role="dialog" aria-modal="false" aria-labelledby="panelTitle" tabindex="-1">
+  <div class="grabber"></div>
+  <div class="panel-scroll">
+    <div class="panel-kicker" id="panelKicker">Component</div>
+    <h3 id="panelTitle">—</h3>
+    <div class="panel-side" id="panelSide"></div>
+    <div id="panelFields"></div>
+  </div>
+  <div class="panel-foot">
+    <button class="btn small" id="pPrev">Previous</button>
+    <button class="btn small primary" id="pNext">Next component</button>
+    <button class="btn small" id="pClose">Close</button>
+  </div>
+</aside>
+
+<!-- TOUR BAR -->
+<div id="tourbar" class="glass" role="region" aria-label="Guided tour">
+  <div class="tour-meta"><b id="tourStep">STEP 1 / 12</b><span id="tourSide">Front of card</span></div>
+  <h3 id="tourTitle">—</h3>
+  <p id="tourText">—</p>
+  <div class="tour-track"><div class="tour-fill" id="tourFill"></div></div>
+  <div class="tour-btns">
+    <button class="btn small" id="tPrev">Previous</button>
+    <button class="btn small primary" id="tNext">Next</button>
+    <button class="btn small" id="tExit">Exit tour</button>
+  </div>
+</div>
+
+<!-- QUIZ BAR -->
+<div id="quizui" class="glass" role="region" aria-label="Quiz">
+  <div class="q-top"><span id="qCount">QUESTION 1 / 12</span><span id="qScore">0 correct</span></div>
+  <h3 id="qText">—</h3>
+  <div class="q-feedback" id="qFeed" aria-live="polite"></div>
+  <div class="q-track"><div class="q-fill" id="qFill"></div></div>
+  <div class="q-btns">
+    <button class="btn small" id="qHint">Show hint</button>
+    <button class="btn small" id="qSkip">Skip question</button>
+    <button class="btn small primary" id="qNext" disabled>Next question</button>
+    <button class="btn small" id="qExit">Exit quiz</button>
+  </div>
+</div>
+
+<!-- COMPARE -->
+<section class="screen" id="compare" aria-label="Credit vs debit">
+  <div style="height:78svh;pointer-events:none" aria-hidden="true"></div>
+  <div class="section wrap" style="padding-top:20px">
+    <div class="kicker">Side by side</div>
+    <h2>Credit vs debit</h2>
+    <p class="lede">Two live 3D cards, both rotatable. The credit card sits on the left, the debit card on the right. Click any marker on either card to read about that component. Physically the two are near-identical; the difference is where the money comes from and how the transaction is authorised.</p>
+    <div class="compare-stageinfo">
+      <span class="chip-label"><span class="swatch" style="background:linear-gradient(135deg,#2B3F6B,#131A2E)"></span> Credit — left</span>
+      <span class="chip-label" style="justify-content:flex-end"><span class="swatch" style="background:linear-gradient(135deg,#124E4A,#0A1620)"></span> Debit — right</span>
+    </div>
+    <table class="ctable">
+      <thead><tr><th></th><th>Credit card</th><th>Debit card</th></tr></thead>
+      <tbody id="compareRows"></tbody>
+    </table>
+    <p class="lede" style="margin-top:26px">Neither type is better than the other. They suit different situations, and many people carry both. Terms, fees, protections and authorisation rules vary by issuer and by country, so your own cardholder agreement is the thing that actually applies to you.</p>
+  </div>
+</section>
+
+<!-- FLOW -->
+<section class="screen" id="flow" aria-label="Payment flow">
+  <div class="section wrap">
+    <div class="kicker">Follow the money</div>
+    <h2>How does a card payment work?</h2>
+    <p class="lede">A tap that takes two seconds is a round trip across several organisations. Watch the pulse travel, or select any stage to read what happens there.</p>
+    <div class="flow" id="flowList"><div class="flow-line"><div class="flow-pulse" id="flowPulse"></div></div></div>
+    <div class="glass" id="flowInfo" aria-live="polite"><h3 id="flowTitle"></h3><p id="flowBody"></p></div>
+    <div class="cta-row" style="justify-content:flex-start;margin-top:24px">
+      <button class="btn small" id="flowReplay">Replay the animation</button>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section class="screen" id="security" aria-label="Card security">
+  <div class="section wrap">
+    <div class="kicker">Handle with care</div>
+    <h2>Card security</h2>
+    <p class="lede">Different parts of a card carry different kinds of risk. Some details are printed on the card and seen by anyone who holds it. Others — your PIN, one-time codes, passwords — are authentication secrets and belong to you alone.</p>
+    <div class="glass note" style="margin-top:24px;border-left-color:var(--cyan);background:linear-gradient(90deg,rgba(95,227,255,.12),rgba(95,227,255,.02));color:#D6EFFA">
+      <strong>Never share your PIN, one-time codes, passwords or security code</strong> with anyone who contacts you — including someone claiming to be your bank, the police, or a delivery company. A genuine bank will not ask you for them. CardLab never asks you to type any real card detail, and nothing on this site is a form.
+    </div>
+    <div class="acc" id="secAcc"></div>
+  </div>
+</section>
+
+<!-- QUIZ SCREEN (intro/results live here; the 3D card is the answer sheet) -->
+<section class="screen" id="quiz" aria-label="Quiz">
+  <div class="section wrap" id="quizIntro">
+    <div class="kicker">Check yourself</div>
+    <h2>Quiz mode</h2>
+    <p class="lede">Twelve questions. Each one asks you to find a part of the card — click the matching marker on the 3D card, or click the part of the card surface itself. Flip the card when a question is about the back. No leaderboard, no timer.</p>
+    <div class="cta-row" style="justify-content:flex-start;margin-top:26px">
+      <button class="btn primary" id="quizStart">Start quiz</button>
+      <button class="btn" data-go="lab">Study the card first</button>
+    </div>
+    <div class="glass pcard" id="quizResult" style="margin-top:30px;display:none"></div>
+  </div>
+</section>
+
+<!-- TEXT VERSION -->
+<section class="screen" id="text" aria-label="Text version">
+  <div class="section wrap">
+    <div class="kicker">No 3D required</div>
+    <h2>Every component, in words</h2>
+    <p class="lede">The full educational content of CardLab, as plain expandable text. Nothing here needs WebGL, a mouse, or a pointer of any kind.</p>
+    <div class="part-list" id="partList"></div>
+  </div>
+</section>
+
+<!-- WEBGL FALLBACK -->
+<section id="fallback" aria-label="2D card">
+  <div class="wrap">
+    <div class="kicker">2D mode</div>
+    <h2 style="font-family:var(--display);font-size:clamp(28px,5vw,44px);margin:12px 0 0;letter-spacing:-.03em">3D isn't available on this device</h2>
+    <p class="lede">WebGL could not start, so CardLab switched to a flat interactive card. Every marker still works and every explanation is identical.</p>
+    <div class="f2d" id="f2d">
+      <div class="fbank">CARDLAB BANK</div>
+      <div class="fchip"></div>
+      <div class="fnum">1234 5678 9012 3456</div>
+      <div class="fname">ALEX MORGAN&nbsp;&nbsp;&nbsp;09/30</div>
+    </div>
+    <div class="cta-row" style="justify-content:flex-start;margin-top:24px">
+      <button class="btn small" data-go="text">Read the text version</button>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    CardLab is an educational demonstration. The bank, card numbers, names and dates shown are fictional and do not correspond to any real card or institution. CardLab never asks for, stores or transmits real card numbers, security codes, PINs, one-time codes or passwords. Illustrations of internal construction are simplified teaching models, not exact representations of any particular card. For anything about your own card, your issuer's cardholder agreement is the authority.
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ===========================================================
+   CARDLAB — data layer (content is fully separate from render)
+   =========================================================== */
+const CARD_SPECS = {
+  credit: {
+    id:'credit', label:'CREDIT', name:'Credit card',
+    bank:'CARDLAB BANK', number:'1234 5678 9012 3456',
+    holder:'ALEX MORGAN', expiry:'09/30', since:'01/26',
+    network:'NOVA', cvvText:'123', service:'1-800-555-0199',
+    palette:{ a:'#2B3F6B', b:'#131A2E', c:'#3C2E6B', accent:'#9FC2FF' }
+  },
+  debit: {
+    id:'debit', label:'DEBIT', name:'Debit card',
+    bank:'CARDLAB BANK', number:'4321 8765 2109 6543',
+    holder:'JORDAN REYES', expiry:'04/29', since:'03/25',
+    network:'NOVA', cvvText:'456', service:'1-800-555-0177',
+    palette:{ a:'#124E4A', b:'#0A1620', c:'#0F3A55', accent:'#8FF0DC' }
+  }
+};
+
+/* Each part: id, title, side, category, positions, and the teaching copy.
+   `only` restricts a part to one card type; `alt` overrides copy per type. */
+const CARD_PARTS = [
+  {
+    id:'issuer', title:'Bank / issuer logo', side:'front', category:'Identity',
+    hotspot:[-0.92,0.74], highlight:[1.1,0.3], cam:{theta:-0.20,phi:1.42,radius:2.0},
+    short:'The name and mark of the bank or institution that issued the card.',
+    detail:'The issuer is the organisation that gave you the card and holds the underlying account. On this fictional sample it reads CARDLAB BANK. The issuer mark is usually the most prominent piece of branding on the front, often paired with a product name such as a rewards tier.',
+    purpose:'It tells a cardholder, a cashier or a support agent instantly who stands behind the card and who to contact about it.',
+    location:'Front of the card, most commonly upper left or upper right.',
+    usage:'You use it when you call support, when you identify the card in a wallet app, and when a merchant needs to know which institution issued it.',
+    notes:'The issuer is not the same as the payment network. The issuer is your bank; the network is the system that carries the transaction between banks.',
+    security:'Logos are easy to copy. Never treat branding alone — on a card, an email, a website or a phone call — as proof that you are dealing with your real bank. Contact your bank using the number you already have.'
+  },
+  {
+    id:'chip', title:'EMV chip', side:'front', category:'Technology',
+    hotspot:[-0.99,0.25], highlight:[0.62,0.50], cam:{theta:-0.30,phi:1.48,radius:1.35},
+    short:'A small embedded chip used by many payment cards.',
+    detail:'The gold rectangle on the front is the visible contact plate of an integrated circuit embedded in the plastic. EMV is the industry specification — named after the three companies that originally developed it — that defines how that chip talks to a payment terminal. The chip is a tiny computer: it can store data and perform calculations rather than simply presenting fixed information.',
+    purpose:'It helps support secure authentication during compatible card transactions. Rather than handing over a static set of details, the chip takes part in the transaction and produces data that is specific to that one payment.',
+    location:'Front of the card, on the left-hand side, roughly a third of the way down.',
+    usage:'You insert the card into the slot of a terminal and leave it there until the terminal says it is finished. That is a contact transaction. The same chip module is usually also what powers contactless taps.',
+    notes:'Because chip data is generated per transaction, copying it is far harder than copying a magnetic stripe. That is the main reason the industry moved to chip. It is a meaningful improvement, not a guarantee against every kind of fraud.',
+    security:'Keep the contact plate clean and unscratched. Take your card out of the terminal when prompted and check you have it before you leave.'
+  },
+  {
+    id:'number', title:'Card number', side:'front', category:'Identity',
+    hotspot:[-0.10,-0.12], highlight:[2.5,0.34], cam:{theta:0,phi:1.50,radius:1.45},
+    short:'The long number that identifies this card within the payment system.',
+    detail:'Most payment cards carry a 16-digit number, though some networks use 15 or up to 19. It is structured rather than random. The opening digits identify the network and the issuing institution, the middle digits identify the individual card account, and the final digit is a check digit calculated from the others so that a mistyped number usually fails an arithmetic check before it ever reaches a bank.',
+    purpose:'It routes the transaction. From those digits the system knows which network to use and which issuer to ask for authorisation.',
+    location:'Front of the card, across the middle. On some cards it is embossed and raised; on others it is flat printed, and on a growing number of cards it has moved to the back or been removed entirely.',
+    usage:'It is read by the chip or stripe in person, and typed or stored when you pay online. A card number is not the same thing as your bank account number: several cards can sit over one account, and replacing a lost card gives you a new card number while the account stays put.',
+    notes:'Card number, security code and PIN do three different jobs. The number identifies, the security code helps show the card was in hand for an online order, and the PIN authenticates you at a terminal. Only the PIN is a secret you personally choose.',
+    security:'Treat the full number like a key to your money. Do not post photographs of your card, and be cautious about who you read it aloud to. If it is exposed, ask your issuer for a replacement card rather than hoping nothing happens.'
+  },
+  {
+    id:'holder', title:'Cardholder name', side:'front', category:'Identity',
+    hotspot:[-0.68,-0.62], highlight:[1.5,0.24], cam:{theta:-0.12,phi:1.56,radius:1.6},
+    short:'The name of the person the card was issued to.',
+    detail:'Printed or embossed along the lower front, the cardholder name marks the card as personal rather than transferable. Business cards often carry a company name on a second line. A rising number of cards are now issued without any name at all, which removes one printed personal detail from a piece of plastic that can be lost.',
+    purpose:'It links the physical card to an individual, and gives a merchant something to match against photo identification when they choose to check.',
+    location:'Front of the card, bottom left, below the card number.',
+    usage:'Online checkouts often ask for it so that it can be compared with the billing record held by the issuer.',
+    notes:'A card is issued to one named person and is generally not meant to be lent out, even to family. Authorised users are added by the issuer and get their own card.',
+    security:'Your name plus your card number is more useful to a fraudster than either alone. That is one reason a photo of a card is worth more to someone else than it looks.'
+  },
+  {
+    id:'expiry', title:'Expiration date', side:'front', category:'Identity',
+    hotspot:[0.30,-0.44], highlight:[0.62,0.28], cam:{theta:0.10,phi:1.54,radius:1.5},
+    short:'The month and year after which the card stops working.',
+    detail:'Shown as MM/YY and usually labelled valid thru or good thru. The card generally remains usable through the last day of the month shown. Some cards also print a member since or valid from date, which is informational rather than functional.',
+    purpose:'It puts a deliberate lifespan on the physical card, so that worn plastic, outdated chips and old security features get cycled out on a schedule.',
+    location:'Front of the card, near the card number, often directly beneath it.',
+    usage:'It is entered alongside the card number for online purchases and is checked during authorisation. Saved cards on subscription services fail once the date passes, which is why services ask you to update details.',
+    notes:'Expiry is about the card, not the account. Your issuer normally posts a replacement before the date arrives, carrying the same account forward with a new expiry and security code.',
+    security:'Destroy the old card once the replacement is active. Cut through the chip and the magnetic stripe rather than simply snapping the card in half.'
+  },
+  {
+    id:'contactless', title:'Contactless symbol', side:'front', category:'Technology',
+    hotspot:[0.62,0.55], highlight:[0.44,0.44], cam:{theta:0.22,phi:1.44,radius:1.3},
+    short:'The four-curve mark showing the card supports tap-to-pay.',
+    detail:'The symbol looks like radio waves radiating outward, and it is an industry-standard indicator rather than a brand. Behind it, a thin antenna loop is laminated inside the card and connected to the chip module. The same mark appears on terminals that accept taps, so a card and a reader can advertise compatibility to each other visually.',
+    purpose:'It tells you at a glance that the card can complete a transaction by being held near a reader instead of inserted.',
+    location:'Front of most contactless cards, usually upper right. On some designs it sits on the back.',
+    usage:'Hold the card a couple of centimetres from the reader until it beeps or shows a confirmation. The card has no battery: the reader generates a field that powers the chip for the moment of the exchange, using near-field communication, a short-range radio technology that works over just a few centimetres.',
+    notes:'A contactless tap uses the same chip as inserting the card, so it produces transaction-specific data in the same way. Issuers and networks typically apply limits, and may ask for a PIN after a run of taps or above a value threshold.',
+    security:'The short range means a reader has to be close to work. Watch the amount on the terminal before you tap, and check your statements — reviewing transactions is the habit that catches problems, whichever way you paid.'
+  },
+  {
+    id:'network', title:'Payment network logo', side:'front', category:'Identity',
+    hotspot:[0.96,-0.70], highlight:[0.66,0.34], cam:{theta:0.24,phi:1.58,radius:1.55},
+    short:'The mark of the network that carries the transaction between banks.',
+    detail:'Usually in a bottom corner of the front, sometimes on the back. This sample uses a fictional network called NOVA. A payment network operates the rails: the shared rules and infrastructure that connect the merchant\'s bank to your bank so that a request and a response can travel between institutions that have no direct relationship.',
+    purpose:'It shows where the card is accepted. A merchant displaying the same mark can process the card.',
+    location:'Front of the card, lower right on this sample.',
+    usage:'You rely on it when checking whether a shop, a country or a website accepts your card, and when picking which card to use abroad.',
+    notes:'Network and issuer are separate organisations doing separate jobs. Your issuer decides whether to approve the payment and holds your account. The network moves the message. Some cards carry two network marks and can be routed either way.',
+    security:'Network branding on a website is not evidence that the site is legitimate. Judge a shop by its own reputation and by how you got to it.'
+  },
+  {
+    id:'stripe', title:'Magnetic stripe', side:'back', category:'Technology',
+    hotspot:[0.00,0.63], highlight:[3.1,0.44], cam:{theta:0,phi:1.36,radius:1.5},
+    short:'The dark band of magnetic material across the top of the back.',
+    detail:'The stripe is a layer of magnetisable particles holding a few tracks of data — essentially the card number, expiry and some service information, written as fixed magnetic patterns. It is the oldest electronic feature on the card and dates from an era when terminals had no processing power of their own.',
+    purpose:'It lets a card be read by swiping, which kept card payments working on simple, offline-capable equipment for decades.',
+    location:'Back of the card, running the full width near the top edge.',
+    usage:'The card is pulled through a slot so the reader passes over the stripe. Many regions have largely retired swiping in favour of chip and contactless, and some newly issued cards no longer include a stripe at all.',
+    notes:'The key conceptual difference from the chip: stripe data is static. Every swipe presents the same stored information, so a copy of it behaves like the original. The chip instead computes fresh data for each transaction, which is why the industry moved across.',
+    security:'Keep the stripe away from strong magnets and from scratching against keys. If a terminal or an unfamiliar attachment looks bulky, loose or added on, use another one — tampered readers have historically targeted swipes.'
+  },
+  {
+    id:'signature', title:'Signature panel', side:'back', category:'Identity',
+    hotspot:[-0.56,0.02], highlight:[2.0,0.34], cam:{theta:-0.16,phi:1.52,radius:1.45},
+    short:'The white or patterned strip intended for the cardholder\'s signature.',
+    detail:'A printed panel with a slightly rough, ink-receptive finish, usually patterned with repeating text or colour so that alterations show. Historically a cashier compared the signature on the panel to the one on the receipt. That check has faded almost everywhere as chip and PIN and contactless took over, and many cards now print a line such as "not valid unless signed" more out of convention than enforcement.',
+    purpose:'It was the original way of tying a card in someone\'s hand to the person it was issued to.',
+    location:'Back of the card, directly below the magnetic stripe.',
+    usage:'If your issuer asks you to sign it, do so in permanent ink when the card arrives. Some regions and issuers no longer use a panel at all.',
+    notes:'The security code is often printed on or beside this panel, which is why the two get confused. They are separate things: one is a signature area, the other is a short printed number.',
+    security:'Writing your PIN anywhere on the card — including on the signature panel — puts the secret and the card together in the same pocket. Never do it.'
+  },
+  {
+    id:'cvv', title:'Security code', side:'back', category:'Security',
+    hotspot:[0.74,0.02], highlight:[0.72,0.34], cam:{theta:0.20,phi:1.52,radius:1.25},
+    short:'The short printed code used mainly for purchases where the card is not present.',
+    detail:'A three-digit number printed on the back of most cards, usually at the right-hand end of the signature panel; some networks use four digits printed on the front instead. It is printed rather than embossed and is not stored on the magnetic stripe, so it does not travel with a swipe. This sample shows a fictional code.',
+    purpose:'It gives an online or telephone merchant a weak signal that whoever is ordering has the physical card in hand, rather than just a number obtained from a list.',
+    location:'Back of the card, on or beside the signature panel.',
+    usage:'You type it at online checkout. Merchants are generally not permitted to store it after the transaction, which is why a saved card still asks for the code on some sites.',
+    notes:'A security code is not a PIN. The code is printed on the card, used online, and you cannot change it without a new card. A PIN is a secret you choose, used at terminals and cash machines, and is never printed anywhere on the card.',
+    security:'Never share your real security code with someone you don\'t trust. No genuine bank, shop or support line will ring you and ask for it. If you are worried about it being visible, some people cover it after memorising it — check your issuer\'s guidance first.',
+    warn:'Never share your real security code with someone you don\'t trust.'
+  },
+  {
+    id:'service', title:'Customer service number', side:'back', category:'Support',
+    hotspot:[-0.42,-0.50], highlight:[1.9,0.24], cam:{theta:-0.12,phi:1.62,radius:1.5},
+    short:'The issuer\'s contact number, printed on the card itself.',
+    detail:'Printed in small type on the back, often with a separate international collect-call number for use abroad. On this sample it is a fictional number. It is deliberately on the card so that it is available at the moment you need it, including when you cannot reach an app or a website.',
+    purpose:'It gives you a route to report a lost or stolen card, dispute a charge, or query a block, without having to search for a number online.',
+    location:'Back of the card, below the signature panel.',
+    usage:'Call it if the card is lost, stolen, retained by a machine, or used for something you did not authorise. Reporting quickly matters.',
+    notes:'Worth photographing or saving the number separately, since if the card is gone the printed number goes with it.',
+    security:'When someone calls you claiming to be the bank, hang up and dial the number on the card or in your banking app instead. A caller who discourages you from doing that is the clearest warning sign there is.'
+  },
+  {
+    id:'info', title:'Additional card information', side:'back', category:'Support',
+    hotspot:[0.30,-0.72], highlight:[2.0,0.30], cam:{theta:0.10,phi:1.66,radius:1.55},
+    short:'The small print: issuer terms, network marks, and card identifiers.',
+    detail:'The lower back of a card collects everything that has nowhere else to go — a statement that the card remains the issuer\'s property, a return address, network and scheme marks, and often a short printed identifier that distinguishes the specific piece of plastic from earlier ones on the same account.',
+    purpose:'It carries the legal and operational details needed to identify and return the card, and to tie it to the terms you agreed to.',
+    location:'Back of the card, along the bottom.',
+    usage:'Support agents sometimes ask for the small printed identifier to confirm which physical card you are holding.',
+    notes:'Cards remain the property of the issuer, which is the legal basis on which a machine or a merchant can retain a card in certain situations.',
+    security:'Because this area carries identifying detail, include it when you destroy an expired card — shred or cut through the whole card rather than only the chip.'
+  }
+];
+
+const FLOW_STAGES = [
+  {t:'Cardholder', s:'You decide to pay', b:'It starts with a choice: which card, and tap, insert or type. Everything after this is the system working out whether that instruction can be carried out, and telling the shop within a couple of seconds.'},
+  {t:'Card', s:'Chip or stripe is read', b:'The card presents its details. A chip takes an active part, computing data specific to this one transaction; a stripe simply presents stored data. Contactless uses the chip over a short-range radio link.'},
+  {t:'Payment terminal', s:'Reads and packages the request', b:'The terminal collects the amount, the card data and its own merchant identifiers, then assembles an authorisation request. It may also prompt for a PIN or a signature depending on the card, the amount and local rules.'},
+  {t:'Merchant', s:'Sends it on for approval', b:'The shop does not decide whether you have the money. It forwards the request through its own payment setup and waits, which is why a checkout pauses for a moment rather than completing instantly.'},
+  {t:'Payment processing', s:'The merchant\'s side of the rails', b:'The merchant\'s acquiring bank and processor handle the technical work of getting a valid, formatted request onto the right network, and later of settling the funds into the merchant\'s account.'},
+  {t:'Payment network', s:'Routes between institutions', b:'The network reads the leading digits of the card number, identifies the issuer, and delivers the request to it. Networks connect institutions that have no direct relationship with each other, under shared rules.'},
+  {t:'Card issuer', s:'Your bank decides', b:'Your issuer checks the account: is the card active, is there available credit or balance, does the chip data check out, does this look like your normal pattern of spending. Then it approves or declines.'},
+  {t:'Authorisation response', s:'The answer travels back', b:'The decision returns along the same path — network, processor, merchant, terminal. On approval the amount is typically held against your account rather than moved immediately; the actual movement of funds happens later in settlement.'},
+  {t:'Merchant', s:'Receipt, and you leave', b:'The terminal shows approved or declined and prints or emails a receipt. Settlement between the banks usually completes over the following days, which is why a pending charge can change slightly before it finalises.'}
+];
+
+const SEC_TOPICS = [
+  {t:'EMV chip', b:'The chip participates in each transaction rather than presenting fixed data, which makes cloning far harder than it was with stripe-only cards. <strong>Use insert or tap rather than swipe where you can.</strong> Take the card out when the terminal tells you to, and if a slot feels obstructed or a reader looks added on, pay elsewhere.'},
+  {t:'Contactless', b:'Taps work over a few centimetres and use the chip\'s transaction-specific data. Issuers apply value limits and periodically require a PIN. <strong>Watch the displayed amount before you tap</strong> and check statements regularly — that habit catches problems with every payment method, not just this one.'},
+  {t:'Magnetic stripe', b:'Stripe data is static, so a copy behaves like the original. That is the weakness the chip was designed to remove. <strong>Prefer chip or contactless</strong>, and treat unusually bulky or loose card slots with suspicion. Many issuers are removing stripes entirely.'},
+  {t:'Card number', b:'The number identifies the card and routes the payment. It is not secret in the way a PIN is — merchants see it constantly — but combined with expiry, name and security code it is enough for an online order. <strong>Don\'t photograph or post your card</strong>, and ask for a replacement if the number is exposed rather than waiting to see what happens.'},
+  {t:'Security code', b:'The short printed code is a weak signal that someone holding the card is placing the order. <strong>Never share your real security code with someone you don\'t trust.</strong> Genuine banks and shops do not phone to ask for it. Merchants should not store it after the payment.'},
+  {t:'PIN', b:'Your PIN is an authentication secret you choose, used at terminals and cash machines. <strong>Never write it on the card, store it beside the card, or tell it to anyone</strong> — no bank employee, police officer or support agent ever needs it. Shield the keypad with your free hand and avoid obvious sequences or dates.'},
+  {t:'One-time codes (OTP)', b:'A one-time code sent by message or generated in an app confirms a specific action for a short window. <strong>Never read a one-time code out to anyone.</strong> A very common scam is a caller asking you to confirm a code they triggered themselves; the code is what lets them finish the transaction. Read what the message says the code is for before using it.'},
+  {t:'Passwords', b:'Banking passwords protect the account behind the card. Use a long, unique password for each financial account, keep them in a password manager rather than reusing one, and turn on additional verification where your bank offers it. <strong>Reach your bank by typing the address or opening the app yourself</strong>, never through a link in a message.'}
+];
+
+const QUIZ = [
+  {q:'Which part of the card is associated with contactless payments?', a:'contactless', side:'front', hint:'Look for the four curved lines, usually in the upper right of the front.', ok:'The contactless symbol indicates that the card supports contactless functionality.', no:'Try again. Look for the contactless symbol.'},
+  {q:'Which component is a small embedded circuit that a terminal reads when you insert the card?', a:'chip', side:'front', hint:'A gold-coloured rectangle on the left of the front.', ok:'That is the EMV chip — the visible contacts of a small embedded circuit.', no:'Try again. Look for the gold contact plate on the front.'},
+  {q:'Where would you find the number that routes a transaction to the right issuer?', a:'number', side:'front', hint:'The long row of digits across the middle of the front.', ok:'The card number identifies the card and tells the network which issuer to ask.', no:'Try again. Look for the long row of digits.'},
+  {q:'Which part tells you after which month the card stops working?', a:'expiry', side:'front', hint:'Two numbers separated by a slash, near the card number.', ok:'That is the expiration date, shown as month and year.', no:'Try again. Look for MM/YY near the card number.'},
+  {q:'Which mark identifies the institution that issued the card and holds the account?', a:'issuer', side:'front', hint:'The bank name, at the top of the front.', ok:'That is the issuer logo — the bank behind the card.', no:'Try again. That is not the issuer mark.'},
+  {q:'Which mark shows which shared rails carry the transaction between banks?', a:'network', side:'front', hint:'A brand mark in a bottom corner of the front.', ok:'That is the payment network logo. The network is separate from your issuer.', no:'Try again. Look in the lower corner of the front.'},
+  {q:'Flip the card. Which part stores data as fixed magnetic patterns?', a:'stripe', side:'back', hint:'A dark band running the full width near the top of the back.', ok:'That is the magnetic stripe, and its data is static — unlike the chip.', no:'Try again. Look for the dark band across the back.'},
+  {q:'Which part is the short printed code used mainly for online purchases?', a:'cvv', side:'back', hint:'Three digits at the right-hand end of the white strip on the back.', ok:'That is the security code. Never share your real one with someone you don\'t trust.', no:'Try again. Look at the right-hand end of the white strip.'},
+  {q:'Which area was originally intended for the cardholder to sign?', a:'signature', side:'back', hint:'The pale strip below the magnetic stripe.', ok:'That is the signature panel, a check that has largely been replaced by chip and PIN.', no:'Try again. Look just below the magnetic stripe.'},
+  {q:'If your card is stolen, which printed detail gives you a number to call?', a:'service', side:'back', hint:'Small print below the signature panel.', ok:'That is the customer service number, printed on the card so it is there when you need it.', no:'Try again. Look at the small print on the back.'},
+  {q:'Which part carries the issuer\'s small print and card identifiers?', a:'info', side:'back', hint:'Along the very bottom of the back.', ok:'That is the additional card information area.', no:'Try again. Look along the bottom edge of the back.'},
+  {q:'Which component produces data specific to each individual transaction?', a:'chip', side:'front', hint:'It is on the front, and it is not printed — it computes.', ok:'The chip computes transaction-specific data, which is why cloning it is much harder.', no:'Try again. Printed details are always the same; this part calculates.'}
+];
+
+const COMPARE_ROWS = [
+  ['Where the funds come from','Money is advanced by the issuer up to an agreed credit line. You repay later, and interest may apply to balances carried past the due date.','Money is drawn from a deposit account you already hold — typically a current or checking account — so the funds are yours from the start.'],
+  ['What a spending limit means','A credit limit set by the issuer, based on their assessment of you. Available credit falls as you spend and returns as you repay.','Your available balance, plus any overdraft arrangement you have agreed with the bank. Spending beyond it may be declined or may incur fees.'],
+  ['How a payment is authorised','The issuer checks available credit and its own risk rules, then approves or declines. An approval places a hold rather than moving money immediately.','The issuer checks the balance in the linked account. Funds are often held or debited quickly, though the final posting can still take a day or more.'],
+  ['PIN use','Commonly required for terminals and always for cash advances, which usually carry extra charges and immediate interest.','Commonly required at terminals and at cash machines for withdrawals from the linked account.'],
+  ['Physical build','Identical construction: rounded corners, chip, contactless antenna, printed or embossed number, signature panel, and a stripe on older stock.','Identical construction. In most cases you cannot tell the two apart without reading what is printed on them.'],
+  ['Security features','Chip authentication, contactless limits, and monitoring by the issuer. Disputed charges are resolved against the credit line rather than cash already gone.','The same chip and contactless technology. Because the money moves out of your own account, a dispute can be felt sooner while it is investigated.'],
+  ['Typical everyday role','Spreading a cost, building a borrowing record where that applies locally, and reserves such as car hire or hotels.','Day-to-day spending and cash withdrawals against money already in the account.']
+];
+</script>
+<script>
+/* ===========================================================
+   CARDLAB — 3D engine + interface
+   Real WebGL geometry via Three.js. No CSS pseudo-3D.
+   =========================================================== */
+(function(){
+'use strict';
+
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.from((r||document).querySelectorAll(s));
+const clamp = (v,a,b)=> Math.max(a,Math.min(b,v));
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const easeIO = t => t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const CARD_W = 3.40, CARD_H = 2.14, CARD_R = 0.17;
+const L_FRONT = 0.013, L_CORE = 0.022, L_BACK = 0.013;
+const HALF = (L_FRONT + L_CORE + L_BACK) / 2;      // ≈ 0.024
+const HS_Z = HALF + 0.006;
+
+/* ---------- state ---------- */
+const S = {
+  screen:'home', cardType:'credit', side:'front', flipped:false,
+  focus:null, spin:false, explode:0, explodeOn:false, xray:0, xrayOn:false,
+  tour:{on:false,i:0}, quiz:{on:false,i:0,correct:0,answered:false,asked:0},
+  mode:'home'
+};
+
+/* ---------- WebGL support ---------- */
+function webglOK(){
+  try{
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+  }catch(e){ return false; }
+}
+
+/* ===========================================================
+   CANVAS TEXTURES  (all card artwork is generated, not fetched)
+   =========================================================== */
+const TW = 1024, TH = Math.round(TW / (CARD_W/CARD_H));   // 1024 x 644
+const px = x => ((x + CARD_W/2) / CARD_W) * TW;
+const py = y => (1 - (y + CARD_H/2) / CARD_H) * TH;
+const pw = w => (w / CARD_W) * TW;
+
+function roundRectPath(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+}
+function newCanvas(){
+  const cv = document.createElement('canvas'); cv.width=TW; cv.height=TH;
+  return cv;
+}
+function clipCard(c){
+  roundRectPath(c, 0, 0, TW, TH, pw(CARD_R)); c.clip();
+}
+const DISPLAY = "'Space Grotesk','Inter',system-ui,sans-serif";
+const SANS = "'Inter',system-ui,sans-serif";
+
+function drawContactless(c, cx, cy, size, color, alpha){
+  c.save(); c.globalAlpha = alpha===undefined?1:alpha;
+  c.strokeStyle = color; c.lineCap='round';
+  for(let i=0;i<4;i++){
+    const r = size*(0.18 + i*0.24);
+    c.lineWidth = size*0.115;
+    c.beginPath(); c.arc(cx - size*0.42, cy, r, -0.72, 0.72); c.stroke();
+  }
+  c.restore();
+}
+function drawNetwork(c, cx, cy, s, spec){
+  // fictional "NOVA" network mark: two overlapping discs + wordmark
+  c.save();
+  c.globalAlpha=.92;
+  c.fillStyle='#E9EEF8'; c.beginPath(); c.arc(cx - s*0.30, cy, s*0.42, 0, Math.PI*2); c.fill();
+  c.fillStyle=spec.palette.accent; c.globalAlpha=.85;
+  c.beginPath(); c.arc(cx + s*0.06, cy, s*0.42, 0, Math.PI*2); c.fill();
+  c.globalAlpha=1;
+  c.fillStyle='#FFFFFF'; c.font = '600 ' + (s*0.52) + 'px ' + DISPLAY;
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillText('NOVA', cx + s*0.62, cy + s*0.02);
+  c.restore();
+}
+
+function frontTexture(spec){
+  const cv = newCanvas(), c = cv.getContext('2d');
+  c.save(); clipCard(c);
+
+  // base gradient
+  const g = c.createLinearGradient(0,0,TW,TH);
+  g.addColorStop(0, spec.palette.a); g.addColorStop(.55, spec.palette.b); g.addColorStop(1, spec.palette.c);
+  c.fillStyle=g; c.fillRect(0,0,TW,TH);
+
+  // soft light bloom
+  const bl = c.createRadialGradient(TW*0.78, TH*0.12, 10, TW*0.78, TH*0.12, TW*0.7);
+  bl.addColorStop(0,'rgba(255,255,255,.16)'); bl.addColorStop(1,'rgba(255,255,255,0)');
+  c.fillStyle=bl; c.fillRect(0,0,TW,TH);
+
+  // guilloche-style hairlines
+  c.save(); c.globalAlpha=.10; c.strokeStyle='#fff'; c.lineWidth=1;
+  for(let i=0;i<46;i++){
+    c.beginPath();
+    for(let x=0;x<=TW;x+=16){
+      const y = TH*0.5 + Math.sin(x*0.006 + i*0.38)*TH*0.30 + i*7 - 160;
+      x===0 ? c.moveTo(x,y) : c.lineTo(x,y);
+    }
+    c.stroke();
+  }
+  c.restore();
+
+  // diagonal sheen
+  c.save(); c.globalAlpha=.09; c.translate(TW*0.1,0); c.rotate(-0.42);
+  const sh=c.createLinearGradient(0,0,0,TH*1.2);
+  sh.addColorStop(0,'rgba(255,255,255,0)'); sh.addColorStop(.5,'rgba(255,255,255,1)'); sh.addColorStop(1,'rgba(255,255,255,0)');
+  c.fillStyle=sh; c.fillRect(-TW,0,TW*1.2,TH*1.6); c.restore();
+
+  // issuer
+  c.fillStyle='#FFFFFF'; c.textBaseline='alphabetic';
+  c.font = '700 ' + pw(0.155) + 'px ' + DISPLAY;
+  c.letterSpacing = '6px';
+  c.fillText('CARDLAB BANK', px(-1.40), py(0.68));
+  c.letterSpacing = '0px';
+  c.globalAlpha=.55; c.fillStyle='#DCE7FA';
+  c.font = '500 ' + pw(0.072) + 'px ' + SANS;
+  c.fillText('Educational sample — not a real card', px(-1.40), py(0.53));
+  c.globalAlpha=1;
+
+  // product label top-right
+  c.textAlign='right';
+  c.fillStyle=spec.palette.accent; c.globalAlpha=.9;
+  c.font='600 ' + pw(0.085) + 'px ' + DISPLAY; c.letterSpacing='4px';
+  c.fillText(spec.label, px(1.42), py(0.72));
+  c.letterSpacing='0px'; c.globalAlpha=1; c.textAlign='left';
+
+  // contactless
+  drawContactless(c, px(0.62)+pw(0.09), py(0.55), pw(0.21), '#FFFFFF', .93);
+
+  // card number (engraved look)
+  const num = spec.number;
+  c.font = '500 ' + pw(0.245) + 'px ' + DISPLAY;
+  c.letterSpacing = '5px';
+  c.fillStyle='rgba(0,0,0,.45)'; c.fillText(num, px(-1.42)+2, py(-0.19)+3);
+  c.fillStyle='rgba(255,255,255,.35)'; c.fillText(num, px(-1.42)-1.5, py(-0.19)-2);
+  c.fillStyle='#F2F6FF'; c.fillText(num, px(-1.42), py(-0.19));
+  c.letterSpacing='0px';
+
+  // valid thru
+  c.fillStyle='rgba(226,235,250,.62)';
+  c.font='500 ' + pw(0.056) + 'px ' + SANS; c.letterSpacing='2px';
+  c.fillText('VALID', px(0.06), py(-0.34));
+  c.fillText('THRU', px(0.06), py(-0.44));
+  c.letterSpacing='0px';
+  c.fillStyle='#EDF3FF';
+  c.font='500 ' + pw(0.135) + 'px ' + DISPLAY; c.letterSpacing='3px';
+  c.fillText(spec.expiry, px(0.26), py(-0.40));
+  c.letterSpacing='0px';
+
+  // cardholder
+  c.fillStyle='#E7EEFB';
+  c.font='500 ' + pw(0.118) + 'px ' + DISPLAY; c.letterSpacing='7px';
+  c.fillText(spec.holder, px(-1.42), py(-0.66));
+  c.letterSpacing='0px';
+
+  // network mark
+  drawNetwork(c, px(0.80), py(-0.70), pw(0.20), spec);
+
+  c.restore();
+  return cv;
+}
+
+function backTexture(spec){
+  const cv = newCanvas(), c = cv.getContext('2d');
+  c.save(); clipCard(c);
+  const g = c.createLinearGradient(0,TH,TW,0);
+  g.addColorStop(0, spec.palette.b); g.addColorStop(.6, spec.palette.a); g.addColorStop(1, spec.palette.b);
+  c.fillStyle=g; c.fillRect(0,0,TW,TH);
+
+  c.save(); c.globalAlpha=.07; c.strokeStyle='#fff'; c.lineWidth=1;
+  for(let i=-30;i<70;i++){ c.beginPath(); c.moveTo(i*24,0); c.lineTo(i*24+TH*0.6,TH); c.stroke(); }
+  c.restore();
+
+  // customer service block
+  c.fillStyle='rgba(232,240,252,.86)'; c.textBaseline='alphabetic';
+  c.font='500 ' + pw(0.085) + 'px ' + DISPLAY; c.letterSpacing='2px';
+  c.fillText('Lost or stolen  ' + spec.service, px(-1.40), py(-0.47));
+  c.letterSpacing='0px';
+  c.fillStyle='rgba(200,214,236,.62)';
+  c.font='400 ' + pw(0.062) + 'px ' + SANS;
+  c.fillText('Outside the country, call collect 1-555-0100 · cardlab.example', px(-1.40), py(-0.58));
+
+  // small print
+  c.fillStyle='rgba(186,201,224,.55)';
+  c.font='400 ' + pw(0.052) + 'px ' + SANS;
+  c.fillText('This card remains the property of CARDLAB BANK and is issued subject to the cardholder agreement.', px(-1.40), py(-0.72));
+  c.fillText('Fictional educational sample. No real account, number or security code is represented here.', px(-1.40), py(-0.80));
+  c.fillStyle='rgba(186,201,224,.42)';
+  c.fillText('CARD ID  CL-' + (spec.id==='credit'?'0001':'0002') + '-EDU', px(-1.40), py(-0.90));
+
+  drawNetwork(c, px(1.02), py(-0.78), pw(0.16), spec);
+  c.restore();
+  return cv;
+}
+
+function signatureTexture(spec){
+  const w=1024, h=180, cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const c=cv.getContext('2d');
+  c.fillStyle='#EDE9E2'; c.fillRect(0,0,w,h);
+  c.save(); c.globalAlpha=.5; c.strokeStyle='#B9C6DC'; c.lineWidth=8;
+  for(let i=-6;i<26;i++){ c.beginPath(); c.moveTo(i*52,h); c.lineTo(i*52+h,0); c.stroke(); }
+  c.restore();
+  c.fillStyle='rgba(60,72,92,.55)'; c.font='500 42px ' + SANS;
+  c.fillText('AUTHORISED SIGNATURE', 26, 64);
+  c.fillStyle='rgba(60,72,92,.35)'; c.font='400 30px ' + SANS;
+  c.fillText('Not valid unless signed', 26, 120);
+  return cv;
+}
+function cvvTexture(spec){
+  const w=420,h=180,cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const c=cv.getContext('2d');
+  c.fillStyle='#F4F1EA'; c.fillRect(0,0,w,h);
+  c.fillStyle='rgba(60,72,92,.35)'; c.font='500 26px ' + SANS;
+  c.fillText('CODE', 24, 46);
+  c.fillStyle='#2A3348'; c.font='600 84px ' + DISPLAY;
+  c.fillText(spec.cvvText, 24, 138);
+  return cv;
+}
+function chipTexture(){
+  const w=512,h=400,cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const c=cv.getContext('2d');
+  const g=c.createLinearGradient(0,0,w,h);
+  g.addColorStop(0,'#F6E4AE'); g.addColorStop(.35,'#D9B45E'); g.addColorStop(.6,'#F2DFA6'); g.addColorStop(1,'#B98F36');
+  c.fillStyle=g; c.fillRect(0,0,w,h);
+  c.strokeStyle='rgba(90,64,12,.75)'; c.lineWidth=9; c.lineCap='round';
+  // contact pad pattern
+  c.strokeRect(34,30,w-68,h-60);
+  c.beginPath();
+  c.moveTo(34,h*0.32); c.lineTo(w*0.33,h*0.32);
+  c.moveTo(34,h*0.68); c.lineTo(w*0.33,h*0.68);
+  c.moveTo(w-34,h*0.32); c.lineTo(w*0.67,h*0.32);
+  c.moveTo(w-34,h*0.68); c.lineTo(w*0.67,h*0.68);
+  c.moveTo(w*0.33,h*0.10); c.lineTo(w*0.33,h*0.90);
+  c.moveTo(w*0.67,h*0.10); c.lineTo(w*0.67,h*0.90);
+  c.moveTo(w*0.33,h*0.5); c.lineTo(w*0.67,h*0.5);
+  c.stroke();
+  c.globalAlpha=.25; c.fillStyle='#fff';
+  c.fillRect(0,0,w,h*0.18);
+  return cv;
+}
+function envCanvas(){
+  const w=1024,h=512,cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const c=cv.getContext('2d');
+  const g=c.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#1B2740'); g.addColorStop(.42,'#0A0F1B'); g.addColorStop(.52,'#05070C'); g.addColorStop(1,'#020308');
+  c.fillStyle=g; c.fillRect(0,0,w,h);
+  // studio softboxes
+  function box(x,y,rw,rh,a){
+    const rg=c.createRadialGradient(x,y,4,x,y,Math.max(rw,rh));
+    rg.addColorStop(0,'rgba(255,255,255,'+a+')'); rg.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=rg; c.beginPath(); c.ellipse(x,y,rw,rh,0,0,Math.PI*2); c.fill();
+  }
+  box(w*0.22,h*0.20,180,110,.95);
+  box(w*0.70,h*0.14,230,120,.75);
+  box(w*0.90,h*0.40,120,90,.45);
+  box(w*0.45,h*0.72,260,80,.18);
+  return cv;
+}
+
+/* ===========================================================
+   SCENE
+   =========================================================== */
+let renderer, scene, camera, raycaster, pmrem;
+const cards = {};            // {credit:{...}, debit:{...}}
+let shadowPlane, clock;
+const cam = { theta:0, phi:Math.PI/2, radius:4.6, tx:0, ty:0, tz:0 };
+const camTarget = Object.assign({}, cam);
+let camTween = null;
+const pointer = new THREE.Vector2();
+
+function makeGeo(w,h,d,r){
+  const s = new THREE.Shape();
+  const x=-w/2, y=-h/2;
+  s.moveTo(x+r,y); s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  const bev = Math.min(0.004, d*0.28);
+  const g = new THREE.ExtrudeGeometry(s, {
+    depth: Math.max(d - bev*2, 0.001), bevelEnabled:true, bevelThickness:bev,
+    bevelSize:bev, bevelSegments:2, curveSegments:18
+  });
+  g.center();
+  return g;
+}
+function tex(canvas){
+  const t = new THREE.CanvasTexture(canvas);
+  t.anisotropy = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+
+function buildCard(spec){
+  const root = new THREE.Group();          // float
+  const pivot = new THREE.Group();         // flip
+  root.add(pivot);
+
+  const bodyMat = new THREE.MeshPhysicalMaterial({
+    color:0x0d1421, metalness:.22, roughness:.42, clearcoat:1, clearcoatRoughness:.18, transparent:true, opacity:1
+  });
+  const coreMat = new THREE.MeshPhysicalMaterial({
+    color:0x1a2336, metalness:.05, roughness:.85, transparent:true, opacity:1
+  });
+
+  const zF = L_CORE/2 + L_FRONT/2, zB = -(L_CORE/2 + L_BACK/2);
+  const front = new THREE.Mesh(makeGeo(CARD_W,CARD_H,L_FRONT,CARD_R), bodyMat.clone()); front.position.z = zF;
+  const core  = new THREE.Mesh(makeGeo(CARD_W*0.998,CARD_H*0.998,L_CORE,CARD_R), coreMat); core.position.z = 0;
+  const back  = new THREE.Mesh(makeGeo(CARD_W,CARD_H,L_BACK,CARD_R), bodyMat.clone()); back.position.z = zB;
+  [front,core,back].forEach(m=>{ m.castShadow=true; m.receiveShadow=true; });
+
+  const artFrontMat = new THREE.MeshPhysicalMaterial({
+    map:tex(frontTexture(spec)), transparent:true, metalness:.16, roughness:.30,
+    clearcoat:1, clearcoatRoughness:.10
+  });
+  const artBackMat = new THREE.MeshPhysicalMaterial({
+    map:tex(backTexture(spec)), transparent:true, metalness:.16, roughness:.34,
+    clearcoat:1, clearcoatRoughness:.14
+  });
+  const artFront = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W,CARD_H), artFrontMat);
+  artFront.position.z = zF + L_FRONT/2 + 0.0012;
+  const artBack = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W,CARD_H), artBackMat);
+  artBack.position.z = zB - L_BACK/2 - 0.0012; artBack.rotation.y = Math.PI;
+
+  // chip (real geometry, sits proud of the surface)
+  const chipMat = new THREE.MeshPhysicalMaterial({ map:tex(chipTexture()), metalness:.92, roughness:.28, transparent:true });
+  const chip = new THREE.Mesh(makeGeo(0.56,0.44,0.012,0.055), chipMat);
+  chip.position.set(-0.99, 0.25, zF + L_FRONT/2 + 0.006);
+  chip.castShadow = true;
+
+  // magnetic stripe
+  const stripeMat = new THREE.MeshPhysicalMaterial({ color:0x0b0c10, metalness:.35, roughness:.62, transparent:true });
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(CARD_W*0.995, 0.44, 0.006), stripeMat);
+  stripe.position.set(0, 0.63, zB - L_BACK/2 - 0.003);
+
+  // signature panel + security code plate
+  const sigMat = new THREE.MeshPhysicalMaterial({ map:tex(signatureTexture(spec)), roughness:.92, metalness:0, transparent:true });
+  const sig = new THREE.Mesh(new THREE.BoxGeometry(1.90, 0.34, 0.004), sigMat);
+  sig.position.set(0.58, 0.02, zB - L_BACK/2 - 0.002);   // local +x == back-view left
+  const cvvMat = new THREE.MeshPhysicalMaterial({ map:tex(cvvTexture(spec)), roughness:.9, metalness:0, transparent:true });
+  const cvv = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, 0.004), cvvMat);
+  cvv.position.set(-0.74, 0.02, zB - L_BACK/2 - 0.002);
+  [sig,cvv].forEach(m=> m.rotation.y = Math.PI);
+
+  // internals for x-ray: antenna loop + chip module
+  const internals = new THREE.Group(); internals.visible = false;
+  const loopMat = new THREE.LineBasicMaterial({ color:0x5FE3FF, transparent:true, opacity:0 });
+  for(let i=0;i<4;i++){
+    const w = CARD_W-0.34-i*0.13, h = CARD_H-0.34-i*0.13;
+    const pts=[]; const seg=90;
+    for(let k=0;k<=seg;k++){
+      const a = k/seg*Math.PI*2;
+      const r = 0.13;
+      // rounded-rect parametric-ish path
+      const x = clamp(Math.cos(a)*w, -(w/2-r), (w/2-r)) ;
+      const y = clamp(Math.sin(a)*h, -(h/2-r), (h/2-r)) ;
+      pts.push(new THREE.Vector3(x,y, -0.001 + i*0.0012));
+    }
+    const lg = new THREE.BufferGeometry().setFromPoints(pts);
+    internals.add(new THREE.Line(lg, loopMat));
+  }
+  const modMat = new THREE.MeshBasicMaterial({ color:0x8F7BFF, transparent:true, opacity:0 });
+  const module = new THREE.Mesh(new THREE.BoxGeometry(0.66,0.52,0.014), modMat);
+  module.position.set(-0.99,0.25,0);
+  internals.add(module);
+  const traceMat = new THREE.MeshBasicMaterial({ color:0x5FE3FF, transparent:true, opacity:0 });
+  const trace = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.03,0.004), traceMat);
+  trace.position.set(-0.40,0.25,0); internals.add(trace);
+
+  // contactless emission rings
+  const rings = new THREE.Group(); rings.visible=false;
+  const ringMats=[];
+  for(let i=0;i<3;i++){
+    const rm = new THREE.MeshBasicMaterial({ color:0x5FE3FF, transparent:true, opacity:0, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false });
+    ringMats.push(rm);
+    const rg = new THREE.RingGeometry(0.16,0.19,48);
+    const rmesh = new THREE.Mesh(rg, rm);
+    rmesh.position.set(0.62,0.55, zF+0.05);
+    rings.add(rmesh);
+  }
+
+  // highlight plate
+  const hlMat = new THREE.MeshBasicMaterial({ color:0x8CE9FF, transparent:true, opacity:0, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false });
+  const highlight = new THREE.Mesh(new THREE.PlaneGeometry(1,1), hlMat);
+  highlight.visible=false;
+
+  pivot.add(front, core, back, artFront, artBack, chip, stripe, sig, cvv, internals, rings, highlight);
+
+  return {
+    spec, root, pivot, front, core, back, artFront, artBack, chip, stripe, sig, cvv,
+    internals, rings, ringMats, loopMat, modMat, traceMat, highlight, hlMat,
+    mats:{ body:[front.material, back.material], core:core.material,
+           art:[artFrontMat,artBackMat], chip:chipMat, stripe:stripeMat, sig:sigMat, cvv:cvvMat },
+    base:{ zF, zB },
+    hitMeshes:[front,core,back,artFront,artBack,chip,stripe,sig,cvv]
+  };
+}
+
+function initScene(){
+  const canvas = $('#gl');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.06;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  raycaster = new THREE.Raycaster();
+  clock = new THREE.Clock();
+
+  // environment (studio reflections)
+  pmrem = new THREE.PMREMGenerator(renderer);
+  const et = new THREE.CanvasTexture(envCanvas());
+  et.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = pmrem.fromEquirectangular(et).texture;
+  et.dispose();
+
+  // lights
+  scene.add(new THREE.HemisphereLight(0x9ec7ff, 0x0a0f18, .55));
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(3.2, 5.0, 4.4);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024,1024);
+  key.shadow.camera.near=1; key.shadow.camera.far=22;
+  key.shadow.camera.left=-7; key.shadow.camera.right=7;
+  key.shadow.camera.top=7; key.shadow.camera.bottom=-7;
+  key.shadow.bias = -0.0012; key.shadow.radius = 4;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x8FB6FF, 1.25); rim.position.set(-5,1.6,-4); scene.add(rim);
+  const fill = new THREE.DirectionalLight(0x8F7BFF, .75); fill.position.set(-2.4,-3,3.2); scene.add(fill);
+
+  shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(26,26), new THREE.ShadowMaterial({ opacity:.42 }));
+  shadowPlane.rotation.x = -Math.PI/2; shadowPlane.position.y = -2.15; shadowPlane.receiveShadow = true;
+  scene.add(shadowPlane);
+
+  cards.credit = buildCard(CARD_SPECS.credit);
+  cards.debit  = buildCard(CARD_SPECS.debit);
+  scene.add(cards.credit.root, cards.debit.root);
+  cards.debit.root.visible = false;
+  cards.credit.root.position.x = 0; cards.debit.root.position.x = 2.15;
+
+  resize();
+  window.addEventListener('resize', resize);
+}
+
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h;
+  camera.fov = w < 760 ? 46 : 38;
+  camera.updateProjectionMatrix();
+  applyModeLayout(true);
+}
+
+/* ===========================================================
+   CAMERA
+   =========================================================== */
+function baseRadius(){
+  const w = window.innerWidth;
+  if(S.mode==='compare') return w<760 ? 11.5 : 7.4;
+  if(w<520) return 5.6; if(w<860) return 5.0;
+  return S.mode==='home' ? 4.7 : 4.3;
+}
+function setCam(to, ms){
+  const from = { theta:cam.theta, phi:cam.phi, radius:cam.radius, tx:cam.tx, ty:cam.ty, tz:cam.tz };
+  const target = Object.assign({}, from, to);
+  // shortest angular path
+  while(target.theta - from.theta > Math.PI) target.theta -= Math.PI*2;
+  while(target.theta - from.theta < -Math.PI) target.theta += Math.PI*2;
+  camTween = { from, to:target, t:0, dur:(reduceMotion?1:(ms||900))/1000 };
+}
+function updateCam(dt){
+  if(camTween){
+    camTween.t += dt;
+    const k = easeIO(clamp(camTween.t/camTween.dur,0,1));
+    for(const key in camTween.to) cam[key] = lerp(camTween.from[key], camTween.to[key], k);
+    if(camTween.t >= camTween.dur) camTween = null;
+  }
+  cam.phi = clamp(cam.phi, 0.30, Math.PI-0.30);
+  cam.radius = clamp(cam.radius, 1.0, 16);
+  const sp = Math.sin(cam.phi);
+  camera.position.set(
+    cam.tx + cam.radius*sp*Math.sin(cam.theta),
+    cam.ty + cam.radius*Math.cos(cam.phi),
+    cam.tz + cam.radius*sp*Math.cos(cam.theta)
+  );
+  camera.lookAt(cam.tx, cam.ty, cam.tz);
+}
+function resetCamera(ms){
+  setCam({ theta:0, phi:Math.PI/2 - (S.mode==='home'?0.06:0.04), radius:baseRadius(), tx:0, ty:0, tz:0 }, ms||900);
+}
+
+/* ===========================================================
+   HOTSPOTS
+   =========================================================== */
+const hsEls = [];   // {el, cardId, part, local:Vector3}
+const _v = new THREE.Vector3();
+
+function partLocal(part){
+  return part.side==='front'
+    ? new THREE.Vector3(part.hotspot[0], part.hotspot[1], HS_Z)
+    : new THREE.Vector3(-part.hotspot[0], part.hotspot[1], -HS_Z);
+}
+function buildHotspots(){
+  const host = $('#hotspots');
+  ['credit','debit'].forEach(cid=>{
+    CARD_PARTS.forEach(part=>{
+      if(part.only && part.only !== cid) return;
+      const el = document.createElement('button');
+      el.className = 'hs';
+      el.type='button';
+      el.setAttribute('aria-label', part.title + ' — click to learn');
+      el.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="lbl"><b>'+part.title+'</b><i>Click to learn</i></span>';
+      el.addEventListener('click', e=>{ e.stopPropagation(); onHotspot(cid, part.id); });
+      el.addEventListener('mouseenter', ()=> hoverPart(cid, part.id, true));
+      el.addEventListener('mouseleave', ()=> hoverPart(cid, part.id, false));
+      el.addEventListener('focus', ()=> hoverPart(cid, part.id, true));
+      el.addEventListener('blur',  ()=> hoverPart(cid, part.id, false));
+      host.appendChild(el);
+      hsEls.push({ el, cardId:cid, part, local:partLocal(part) });
+    });
+  });
+}
+function updateHotspots(){
+  let showStage = (S.screen==='home'||S.screen==='lab'||S.screen==='compare'||S.screen==='quiz');
+  if(S.screen==='compare' && window.scrollY > window.innerHeight*0.45) showStage = false;
+  const w = window.innerWidth, h = window.innerHeight;
+  hsEls.forEach(o=>{
+    const card = cards[o.cardId];
+    const visibleCard = card.root.visible && showStage;
+    if(!visibleCard || (S.screen==='home' && false)){ o.el.classList.add('faded'); o.el.tabIndex=-1; return; }
+    // side visibility: is this face pointing at the camera?
+    _v.copy(o.local).applyMatrix4(card.pivot.matrixWorld);
+    const normal = new THREE.Vector3(0,0, o.part.side==='front'?1:-1)
+      .transformDirection(card.pivot.matrixWorld);
+    const toCam = camera.position.clone().sub(_v).normalize();
+    const facing = normal.dot(toCam);
+    const p = _v.clone().project(camera);
+    const onScreen = p.z < 1 && Math.abs(p.x)<1.25 && Math.abs(p.y)<1.25;
+    const dim = (S.focus && S.focus.partId !== o.part.id) || (S.focus && S.focus.cardId!==o.cardId);
+    if(facing < 0.22 || !onScreen || S.explode>0.02){
+      o.el.classList.add('faded'); o.el.tabIndex=-1; return;
+    }
+    o.el.classList.remove('faded');
+    o.el.tabIndex = 0;
+    o.el.style.opacity = dim ? '0.35' : '1';
+    o.el.style.left = ((p.x*0.5+0.5)*w) + 'px';
+    o.el.style.top  = ((-p.y*0.5+0.5)*h) + 'px';
+    o.el.classList.toggle('quiz', S.quiz.on);
+    o.el.classList.toggle('on', !!(S.focus && S.focus.partId===o.part.id && S.focus.cardId===o.cardId));
+    if(S.quiz.on){
+      o.el.querySelector('.lbl b').textContent = S.quiz.answered ? o.part.title : 'Select this part';
+    }else{
+      o.el.querySelector('.lbl b').textContent = o.part.title;
+    }
+  });
+}
+
+/* ===========================================================
+   FOCUS / HIGHLIGHT
+   =========================================================== */
+function partById(id){ return CARD_PARTS.find(p=>p.id===id); }
+
+function placeHighlight(card, part){
+  const [w,hgt] = part.highlight;
+  card.highlight.geometry.dispose();
+  card.highlight.geometry = new THREE.PlaneGeometry(w, hgt);
+  const l = partLocal(part);
+  card.highlight.position.set(l.x, l.y, part.side==='front' ? HALF+0.004 : -(HALF+0.004));
+  card.highlight.rotation.y = part.side==='front' ? 0 : Math.PI;
+  card.highlight.visible = true;
+}
+function hoverPart(cardId, partId, on){
+  if(S.focus) return;
+  const card = cards[cardId], part = partById(partId);
+  if(on){ placeHighlight(card, part); card.hlMat.opacity = 0.16; }
+  else { card.highlight.visible=false; card.hlMat.opacity=0; }
+}
+
+function focusPart(cardId, partId, opts){
+  opts = opts||{};
+  const part = partById(partId), card = cards[cardId];
+  if(!part || !card) return;
+  S.focus = { cardId, partId };
+  setSide(part.side, true);
+  placeHighlight(card, part);
+  card.rings.visible = (partId==='contactless');
+  const l = partLocal(part);
+  const world = l.clone().applyMatrix4(card.pivot.matrixWorld);
+  // account for flip that is still animating: use the settled flip
+  const settled = new THREE.Vector3(part.hotspot[0], part.hotspot[1], HS_Z);
+  const cx = card.root.position.x;
+  setCam({
+    theta: part.cam.theta, phi: part.cam.phi, radius: part.cam.radius,
+    tx: cx + settled.x*0.82, ty: settled.y*0.82, tz: 0
+  }, 950);
+  if(!opts.noPanel) openPanel(cardId, partId);
+  updateSideButtons();
+}
+function clearFocus(keepCam){
+  if(!S.focus) return;
+  const card = cards[S.focus.cardId];
+  card.highlight.visible=false; card.hlMat.opacity=0; card.rings.visible=false;
+  S.focus = null;
+  if(!keepCam) resetCamera(850);
+}
+
+/* ===========================================================
+   PANEL
+   =========================================================== */
+const panel = $('#panel'), scrim = $('#scrim');
+function panelFields(part, cardId){
+  const spec = CARD_SPECS[cardId];
+  const f = [
+    ['What is it?', part.detail],
+    ['Purpose', part.purpose],
+    ['Location', part.location],
+    ['How it is used', part.usage],
+    ['Worth knowing', part.notes]
+  ];
+  let html = '';
+  f.forEach(([h,b])=> html += '<div class="field"><h4>'+h+'</h4><p>'+b+'</p></div>');
+  if(part.warn) html += '<div class="note" style="border-left-color:#FF9F6E;background:linear-gradient(90deg,rgba(255,159,110,.14),rgba(255,159,110,.03));color:#FFD9C2"><strong>'+part.warn+'</strong></div>';
+  html += '<div class="note"><strong>Security</strong><br>'+part.security+'</div>';
+  html += '<div class="field"><h4>Learn more</h4><p>On this ' + spec.name.toLowerCase() +
+    ', this part sits alongside ' + neighbours(part) + '. Use the next and previous buttons to walk the ' +
+    part.side + ' of the card in order, or open the text version from the menu for everything at once.</p></div>';
+  return html;
+}
+function neighbours(part){
+  const same = CARD_PARTS.filter(p=>p.side===part.side && p.id!==part.id).slice(0,2).map(p=>p.title.toLowerCase());
+  return same.join(' and ');
+}
+function openPanel(cardId, partId){
+  const part = partById(partId);
+  $('#panelKicker').textContent = part.category + ' · ' + CARD_SPECS[cardId].name;
+  $('#panelTitle').textContent = part.title;
+  $('#panelSide').textContent = (part.side==='front'?'Front of the card':'Back of the card') + ' · ' + part.short;
+  $('#panelFields').innerHTML = panelFields(part, cardId);
+  $('.panel-scroll').scrollTop = 0;
+  panel.classList.add('open');
+  if(window.innerWidth<=820) scrim.classList.add('on');
+}
+function closePanel(){
+  panel.classList.remove('open'); scrim.classList.remove('on');
+  if(!S.tour.on && !S.quiz.on) clearFocus();
+}
+function stepPanel(dir){
+  if(!S.focus) return;
+  const list = CARD_PARTS.filter(p=>!p.only || p.only===S.focus.cardId);
+  let i = list.findIndex(p=>p.id===S.focus.partId);
+  i = (i + dir + list.length) % list.length;
+  focusPart(S.focus.cardId, list[i].id);
+}
+
+/* ===========================================================
+   MODES: flip / explode / xray / layout
+   =========================================================== */
+let flipTarget = 0;
+function setSide(side, silent){
+  S.side = side; S.flipped = (side==='back');
+  flipTarget = S.flipped ? Math.PI : 0;
+  updateSideButtons();
+}
+function toggleFlip(){ setSide(S.flipped?'front':'back'); if(S.focus && partById(S.focus.partId).side !== S.side) clearFocus(true), closePanel(); }
+function updateSideButtons(){
+  $$('[data-side]').forEach(b=> b.setAttribute('aria-pressed', String(b.dataset.side===S.side)));
+  $$('[data-card]').forEach(b=> b.setAttribute('aria-pressed', String(b.dataset.card===S.cardType)));
+}
+function setExplode(on){
+  S.explodeOn = on;
+  $('[data-tool="explode"]').setAttribute('aria-pressed', String(on));
+  if(on){
+    closePanel(); clearFocus(true);
+    setCam({ theta:-0.55, phi:1.15, radius: window.innerWidth<760?7.2:5.6, tx:0,ty:0,tz:0 }, 1100);
+    labSub('Exploded view — a simplified teaching model of how a card is built up, not an exact representation of every real card.');
+  } else {
+    resetCamera(1000); labSub();
+  }
+}
+function setXray(on){
+  S.xrayOn = on;
+  $('[data-tool="xray"]').setAttribute('aria-pressed', String(on));
+  ['credit','debit'].forEach(k=> cards[k].internals.visible = on);
+  labSub(on ? 'X-ray view — the antenna loop and chip module shown here are a simplified illustration of internal layout.' : undefined);
+  if(on) setCam({ theta:-0.18, phi:1.38, radius: baseRadius()*0.92 }, 900);
+}
+function labSub(t){
+  $('#labSub').textContent = t || 'Drag to rotate · scroll to zoom · click a marker to learn';
+}
+function setCardType(type){
+  S.cardType = type;
+  cards.credit.root.visible = (type==='credit' || S.mode==='compare');
+  cards.debit.root.visible  = (type==='debit'  || S.mode==='compare');
+  $('#labTitle').textContent = CARD_SPECS[type].name;
+  updateSideButtons();
+}
+function applyModeLayout(instant){
+  const compare = S.mode==='compare';
+  cards.credit.root.visible = compare ? true : S.cardType==='credit';
+  cards.debit.root.visible  = compare ? true : S.cardType==='debit';
+  const gap = window.innerWidth<760 ? 0 : 2.15;
+  const stackY = window.innerWidth<760 ? 1.35 : 0;
+  cards.credit.targetX = compare ? -gap : 0;
+  cards.debit.targetX  = compare ?  gap : 0;
+  cards.credit.targetY = compare ?  stackY : 0;
+  cards.debit.targetY  = compare ? -stackY : 0;
+  if(instant){
+    cards.credit.root.position.x = cards.credit.targetX;
+    cards.debit.root.position.x  = cards.debit.targetX;
+  }
+  if(!camTween) cam.radius = baseRadius();
+}
+
+/* ===========================================================
+   POINTER CONTROLS  (custom orbit: drag / wheel / pinch)
+   =========================================================== */
+function initControls(){
+  const el = $('#gl');
+  let dragging=false, lastX=0, lastY=0, moved=0, pinchDist=0;
+  const pts = new Map();
+
+  el.addEventListener('pointerdown', e=>{
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    el.setPointerCapture(e.pointerId);
+    dragging = true; moved=0; lastX=e.clientX; lastY=e.clientY;
+    if(pts.size===2){ const a=[...pts.values()]; pinchDist = Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y); }
+  });
+  el.addEventListener('pointermove', e=>{
+    if(pts.has(e.pointerId)) pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){
+      const a=[...pts.values()]; const d = Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y);
+      if(pinchDist){ cam.radius = clamp(cam.radius * (pinchDist/d), 1.1, 16); camTween=null; }
+      pinchDist = d; return;
+    }
+    if(!dragging) return;
+    const dx = e.clientX-lastX, dy = e.clientY-lastY;
+    lastX=e.clientX; lastY=e.clientY; moved += Math.abs(dx)+Math.abs(dy);
+    if(moved>4){ camTween=null; }
+    cam.theta -= dx*0.006;
+    cam.phi = clamp(cam.phi - dy*0.006, 0.30, Math.PI-0.30);
+  });
+  function up(e){
+    pts.delete(e.pointerId); if(pts.size<2) pinchDist=0;
+    if(dragging && moved<5) onCanvasTap(e);
+    if(pts.size===0) dragging=false;
+  }
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', e=>{
+    e.preventDefault(); camTween=null;
+    cam.radius = clamp(cam.radius * (1 + Math.sign(e.deltaY)*0.09), 1.1, 16);
+  }, {passive:false});
+  el.addEventListener('dblclick', e=>{
+    const hit = pickPart(e); if(hit) focusPart(hit.cardId, hit.part.id);
+    else setCam({ radius: clamp(cam.radius*0.62, 1.4, 16) }, 700);
+  });
+
+  window.addEventListener('keydown', e=>{
+    if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+    const k = e.key.toLowerCase();
+    if(k==='escape'){ if(S.tour.on) endTour(); else if(panel.classList.contains('open')) closePanel(); return; }
+    if(S.screen!=='lab' && S.screen!=='home' && S.screen!=='compare' && S.screen!=='quiz') return;
+    if(k==='arrowleft'){ camTween=null; cam.theta -= 0.12; e.preventDefault(); }
+    if(k==='arrowright'){ camTween=null; cam.theta += 0.12; e.preventDefault(); }
+    if(k==='arrowup'){ camTween=null; cam.phi = clamp(cam.phi-0.08,0.3,Math.PI-0.3); e.preventDefault(); }
+    if(k==='arrowdown'){ camTween=null; cam.phi = clamp(cam.phi+0.08,0.3,Math.PI-0.3); e.preventDefault(); }
+    if(k==='+'||k==='='){ setCam({radius:clamp(cam.radius*0.82,1.1,16)},400); }
+    if(k==='-'||k==='_'){ setCam({radius:clamp(cam.radius*1.22,1.1,16)},400); }
+    if(k==='f') toggleFlip();
+    if(k==='r'){ clearFocus(); closePanel(); resetCamera(); }
+    if(k==='x') setXray(!S.xrayOn);
+    if(k==='e') setExplode(!S.explodeOn);
+  });
+}
+
+function pickPart(e){
+  const r = $('#gl').getBoundingClientRect();
+  pointer.x = ((e.clientX-r.left)/r.width)*2-1;
+  pointer.y = -((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(pointer, camera);
+  const list = [];
+  ['credit','debit'].forEach(k=>{ if(cards[k].root.visible) list.push(...cards[k].hitMeshes); });
+  const hits = raycaster.intersectObjects(list, false);
+  if(!hits.length) return null;
+  const hit = hits[0];
+  const cardId = cards.credit.hitMeshes.includes(hit.object) ? 'credit' : 'debit';
+  const card = cards[cardId];
+  const p = card.pivot.worldToLocal(hit.point.clone());
+  const side = p.z >= 0 ? 'front' : 'back';
+  const hx = side==='front' ? p.x : -p.x, hy = p.y;
+  let best=null, bd=1e9;
+  CARD_PARTS.forEach(part=>{
+    if(part.side!==side) return;
+    if(part.only && part.only!==cardId) return;
+    const dx = Math.abs(hx-part.hotspot[0]) / Math.max(part.highlight[0]*0.62, 0.26);
+    const dy = Math.abs(hy-part.hotspot[1]) / Math.max(part.highlight[1]*0.75, 0.20);
+    const d = Math.hypot(dx,dy);
+    if(d<bd){ bd=d; best=part; }
+  });
+  return (best && bd < 1.5) ? { cardId, part:best, dist:bd } : { cardId, part:null, dist:bd };
+}
+function onCanvasTap(e){
+  const hit = pickPart(e);
+  if(S.quiz.on){ quizAnswer(hit && hit.part ? hit.part.id : null); return; }
+  if(hit && hit.part && hit.dist < 1.0){ onHotspot(hit.cardId, hit.part.id); }
+}
+function onHotspot(cardId, partId){
+  if(S.quiz.on){ quizAnswer(partId); return; }
+  if(S.tour.on) endTour(true);
+  if(S.screen==='home') goScreen('lab', {keepCard:true});
+  focusPart(cardId, partId);
+}
+
+/* ===========================================================
+   ANIMATION LOOP
+   =========================================================== */
+let t0 = 0;
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  t0 += dt;
+
+  // auto spin
+  if(S.spin && !camTween && !S.focus) cam.theta += dt*0.28;
+
+  // explode / xray easing
+  const eT = S.explodeOn?1:0;
+  S.explode = lerp(S.explode, eT, 1-Math.pow(0.001, dt));
+  const xT = S.xrayOn?1:0;
+  S.xray = lerp(S.xray, xT, 1-Math.pow(0.004, dt));
+
+  ['credit','debit'].forEach(k=>{
+    const c = cards[k];
+    if(!c.root.visible) return;
+    // float
+    const amp = reduceMotion ? 0 : 1;
+    c.root.position.y = lerp(c.root.position.y, (c.targetY||0), 0.08) ;
+    c.root.position.x = lerp(c.root.position.x, (c.targetX||0), 0.08);
+    c.pivot.position.y = amp * Math.sin(t0*0.7 + (k==='debit'?1.6:0))*0.045;
+    c.pivot.rotation.x = amp * Math.sin(t0*0.45 + (k==='debit'?1.1:0))*0.022;
+    c.pivot.rotation.z = amp * Math.sin(t0*0.33)*0.012;
+    // flip
+    c.pivot.rotation.y += (flipTarget - c.pivot.rotation.y) * (reduceMotion?1:0.10);
+
+    // explode offsets
+    const E = S.explode;
+    c.front.position.z    = c.base.zF + E*0.55;
+    c.artFront.position.z = c.base.zF + L_FRONT/2 + 0.0012 + E*0.80;
+    c.chip.position.z     = c.base.zF + L_FRONT/2 + 0.006 + E*1.10;
+    c.core.position.z     = 0;
+    c.internals.position.z= -E*0.12;
+    c.back.position.z     = c.base.zB - E*0.55;
+    c.artBack.position.z  = c.base.zB - L_BACK/2 - 0.0012 - E*0.80;
+    c.stripe.position.z   = c.base.zB - L_BACK/2 - 0.003 - E*1.05;
+    c.sig.position.z      = c.base.zB - L_BACK/2 - 0.002 - E*1.22;
+    c.cvv.position.z      = c.base.zB - L_BACK/2 - 0.002 - E*1.30;
+
+    // x-ray transparency
+    const o = 1 - S.xray*0.86;
+    c.mats.body.forEach(m=> m.opacity = o);
+    c.mats.core.opacity = 1 - S.xray*0.94;
+    c.mats.art.forEach(m=> m.opacity = 1 - S.xray*0.80);
+    c.mats.stripe.opacity = 1 - S.xray*0.6;
+    c.loopMat.opacity = S.xray*0.95;
+    c.modMat.opacity = S.xray*0.55;
+    c.traceMat.opacity = S.xray*0.8;
+
+    // dim non-focused artwork
+    const dimmed = !!S.focus && S.focus.cardId===k;
+    const tint = dimmed ? 0.52 : 1;
+    c.mats.art.forEach(m=> m.color.setScalar(lerp(m.color.r, tint, 0.12)));
+    if(S.focus && S.focus.cardId!==k) c.mats.art.forEach(m=> m.color.setScalar(lerp(m.color.r, 0.45, 0.12)));
+
+    // highlight pulse
+    if(c.highlight.visible){
+      const base = S.focus && S.focus.cardId===k ? 0.30 : 0.16;
+      c.hlMat.opacity = base + (reduceMotion?0:Math.sin(t0*3.2)*0.07);
+    }
+    // contactless rings
+    if(c.rings.visible){
+      c.rings.children.forEach((m,i)=>{
+        const ph = (t0*0.75 + i*0.33) % 1;
+        const s = 0.6 + ph*2.6;
+        m.scale.set(s,s,1);
+        c.ringMats[i].opacity = (1-ph)*0.55;
+      });
+    }
+  });
+
+  updateCam(dt);
+  cards.credit.pivot.updateMatrixWorld();
+  cards.debit.pivot.updateMatrixWorld();
+  updateHotspots();
+  renderer.render(scene, camera);
+}
+
+/* ===========================================================
+   SCREENS
+   =========================================================== */
+function goScreen(name, opts){
+  opts = opts||{};
+  S.screen = name;
+  $$('.screen').forEach(s=> s.classList.toggle('active', s.id===name));
+  $('#lab').classList.toggle('active', name==='lab' || name==='quiz');
+  $$('.nav-links button[data-go]').forEach(b=>{
+    b.toggleAttribute('aria-current', b.dataset.go===name);
+    if(b.dataset.go===name) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
+  const stageOn = ['home','lab','compare','quiz'].includes(name);
+  $('#stage').classList.toggle('hidden-stage', !stageOn);
+  $('#hotspots').style.display = stageOn ? '' : 'none';
+  document.body.style.overflow = (name==='home'||name==='lab') ? 'hidden' : '';
+  window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+
+  if(name==='quiz'){ $('#lab').classList.add('active'); }
+  if(name!=='quiz' && S.quiz.on) endQuiz(true);
+  if(name!=='lab' && name!=='quiz' && S.tour.on) endTour(true);
+
+  S.mode = (name==='compare') ? 'compare' : (name==='home' ? 'home' : (stageOn ? 'lab' : S.mode));
+  if(stageOn){
+    if(name==='compare'){ closePanel(); clearFocus(true); }
+    applyModeLayout(false);
+    if(!opts.keepCam) resetCamera(900);
+  }
+  if(name==='lab' && !opts.keepCard) setCardType(S.cardType);
+  if(name==='flow') startFlowPulse();
+}
+
+/* ===========================================================
+   GUIDED TOUR
+   =========================================================== */
+const tourBar = $('#tourbar');
+function tourList(){ return CARD_PARTS.filter(p=>!p.only || p.only===S.cardType); }
+function startTour(){
+  if(S.quiz.on) endQuiz(true);
+  goScreen('lab', {keepCard:true, keepCam:true});
+  S.tour.on = true; S.tour.i = 0;
+  tourBar.classList.add('open');
+  closePanel();
+  setExplodeSilently(false); setXray(false);
+  showTourStep();
+}
+function setExplodeSilently(v){ S.explodeOn=v; $('[data-tool="explode"]').setAttribute('aria-pressed',String(v)); }
+function showTourStep(){
+  const list = tourList(), n = list.length, i = S.tour.i;
+  if(i >= n){ tourComplete(); return; }
+  const part = list[i];
+  $('#tourStep').textContent = 'STEP ' + (i+1) + ' / ' + n;
+  $('#tourSide').textContent = part.side==='front' ? 'Front of card' : 'Back of card';
+  $('#tourTitle').textContent = part.title;
+  $('#tourText').textContent = part.short + ' ' + part.purpose;
+  $('#tourFill').style.width = ((i+1)/n*100) + '%';
+  $('#tPrev').disabled = i===0;
+  $('#tNext').textContent = i===n-1 ? 'Finish tour' : 'Next';
+  focusPart(S.cardType, part.id, {noPanel:true});
+}
+function tourComplete(){
+  $('#tourStep').textContent = 'TOUR COMPLETE';
+  $('#tourSide').textContent = tourList().length + ' components';
+  $('#tourTitle').textContent = 'Tour complete';
+  $('#tourText').textContent = 'You have seen every labelled component on both sides of this card. Explore freely from here, or open a component again for the full explanation.';
+  $('#tourFill').style.width='100%';
+  $('#tNext').textContent = 'Explore freely';
+  S.tour.i = tourList().length;
+  clearFocus();
+}
+function endTour(silent){
+  S.tour.on=false; tourBar.classList.remove('open');
+  if(!silent){ clearFocus(); closePanel(); resetCamera(); }
+}
+
+/* ===========================================================
+   QUIZ
+   =========================================================== */
+const quizBar = $('#quizui');
+function startQuiz(){
+  if(S.tour.on) endTour(true);
+  S.quiz = {on:true, i:0, correct:0, answered:false, asked:0};
+  goScreen('quiz', {keepCard:true});
+  $('#lab').classList.add('active');
+  $('#quizResult').style.display='none';
+  showQuizIntro(false);
+  quizBar.classList.add('open');
+  closePanel(); clearFocus();
+  setExplodeSilently(false); setXray(false);
+  showQuestion();
+}
+function showQuestion(){
+  const q = QUIZ[S.quiz.i];
+  $('#qCount').textContent = 'QUESTION ' + (S.quiz.i+1) + ' / ' + QUIZ.length;
+  $('#qScore').textContent = S.quiz.correct + ' correct';
+  $('#qText').textContent = q.q;
+  $('#qFeed').textContent = ''; $('#qFeed').className='q-feedback';
+  $('#qFill').style.width = (S.quiz.i/QUIZ.length*100)+'%';
+  $('#qNext').disabled = true;
+  S.quiz.answered = false;
+  clearFocus(true);
+  cards[S.cardType].highlight.visible=false;
+}
+function quizAnswer(partId){
+  if(S.quiz.answered) return;
+  const q = QUIZ[S.quiz.i];
+  const feed = $('#qFeed');
+  if(!partId){ feed.className='q-feedback no'; feed.textContent='Try again. Click a marker on the card, or the part of the card surface itself.'; return; }
+  if(partId === q.a){
+    S.quiz.answered = true; S.quiz.correct++; S.quiz.asked++;
+    feed.className='q-feedback ok';
+    feed.textContent = 'Correct. ' + q.ok;
+    $('#qNext').disabled = false;
+    $('#qScore').textContent = S.quiz.correct + ' correct';
+    focusPart(S.cardType, q.a, {noPanel:true});
+  } else {
+    feed.className='q-feedback no';
+    const chosen = partById(partId);
+    feed.textContent = q.no + (chosen ? ' (You selected the ' + chosen.title.toLowerCase() + '.)' : '');
+  }
+}
+function quizNext(){
+  S.quiz.i++;
+  if(S.quiz.i >= QUIZ.length){ quizComplete(); return; }
+  showQuestion();
+}
+function quizSkip(){
+  if(!S.quiz.answered) S.quiz.asked++;
+  quizNext();
+}
+function showQuizIntro(on){
+  $('#quizIntro').style.display = on ? '' : 'none';
+  document.body.style.overflow = on ? '' : 'hidden';
+}
+function quizComplete(){
+  quizBar.classList.remove('open');
+  showQuizIntro(true);
+  S.quiz.on = false;
+  clearFocus();
+  const box = $('#quizResult');
+  box.style.display='block';
+  box.innerHTML = '<h3 style="font-family:var(--display);margin:0 0 8px;font-size:22px">Quiz complete</h3>' +
+    '<p style="color:#C6D2E6;line-height:1.7;margin:0">You answered <strong>' + S.quiz.correct + ' of ' + QUIZ.length +
+    '</strong> questions correctly. There is no ranking here — the point is knowing where each part sits and what it does. ' +
+    'Anything that felt uncertain is worth a second look in the card lab or the text version.</p>' +
+    '<div class="cta-row" style="justify-content:flex-start;margin-top:20px">' +
+    '<button class="btn primary" id="qAgain">Take it again</button>' +
+    '<button class="btn" data-go="lab">Back to the card lab</button>' +
+    '<button class="btn" data-go="text">Read the text version</button></div>';
+  $('#qAgain').addEventListener('click', startQuiz);
+  bindGoButtons(box);
+}
+function endQuiz(silent){
+  S.quiz.on=false; quizBar.classList.remove('open'); showQuizIntro(true);
+  if(!silent){ clearFocus(); goScreen('lab'); }
+}
+
+/* ===========================================================
+   FLOW SECTION
+   =========================================================== */
+let flowTimer=null;
+function buildFlow(){
+  const host = $('#flowList');
+  FLOW_STAGES.forEach((s,i)=>{
+    const b = document.createElement('button');
+    b.className='fnode'; b.type='button'; b.dataset.i=i;
+    b.innerHTML = '<span class="fnum">'+(i+1)+'</span><span><h3>'+s.t+'</h3><p>'+s.s+'</p></span>';
+    b.addEventListener('click', ()=>{
+      $('#flowTitle').textContent = s.t;
+      $('#flowBody').textContent = s.b;
+      $('#flowInfo').classList.add('show');
+      $$('.fnode').forEach(n=>n.classList.remove('lit'));
+      b.classList.add('lit');
+      stopFlowPulse();
+    });
+    host.appendChild(b);
+  });
+}
+function startFlowPulse(){
+  stopFlowPulse();
+  if(reduceMotion) return;
+  const nodes = $$('.fnode');
+  const pulse = $('#flowPulse');
+  const track = $('.flow-line');
+  let i = 0;
+  const step = ()=>{
+    nodes.forEach(n=>n.classList.remove('lit'));
+    const n = nodes[i]; if(!n) return;
+    n.classList.add('lit');
+    const top = n.offsetTop + n.offsetHeight/2 - track.offsetTop - 30;
+    pulse.style.transition = 'top .55s cubic-bezier(.4,0,.2,1)';
+    pulse.style.top = top + 'px';
+    i = (i+1) % nodes.length;
+  };
+  step();
+  flowTimer = setInterval(step, 1500);
+}
+function stopFlowPulse(){ if(flowTimer){ clearInterval(flowTimer); flowTimer=null; } }
+
+/* ===========================================================
+   STATIC CONTENT BUILDERS
+   =========================================================== */
+function buildCompareTable(){
+  const tb = $('#compareRows');
+  COMPARE_ROWS.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+r[0]+'</td><td data-l="Credit card">'+r[1]+'</td><td data-l="Debit card">'+r[2]+'</td>';
+    tb.appendChild(tr);
+  });
+}
+function buildSecurity(){
+  const host = $('#secAcc');
+  SEC_TOPICS.forEach((t,i)=>{
+    const d = document.createElement('div');
+    d.className='acc-item glass';
+    d.innerHTML = '<button class="acc-btn" aria-expanded="false">'+t.t+'<span class="plus" aria-hidden="true">+</span></button>' +
+                  '<div class="acc-body"><div class="acc-inner">'+t.b+'</div></div>';
+    const btn = d.querySelector('.acc-btn');
+    btn.addEventListener('click', ()=>{
+      const open = d.classList.toggle('open');
+      btn.setAttribute('aria-expanded', String(open));
+    });
+    host.appendChild(d);
+  });
+}
+function buildTextVersion(){
+  const host = $('#partList');
+  CARD_PARTS.forEach(p=>{
+    const d = document.createElement('details');
+    d.className='part glass';
+    d.innerHTML =
+      '<summary>'+p.title+' <span class="tagpill">'+(p.side==='front'?'Front':'Back')+' · '+p.category+'</span></summary>' +
+      '<div class="part-body"><dl>' +
+      '<dt>What is it?</dt><dd>'+p.detail+'</dd>' +
+      '<dt>Purpose</dt><dd>'+p.purpose+'</dd>' +
+      '<dt>Location</dt><dd>'+p.location+'</dd>' +
+      '<dt>How it is used</dt><dd>'+p.usage+'</dd>' +
+      '<dt>Worth knowing</dt><dd>'+p.notes+'</dd>' +
+      '<dt>Security</dt><dd>'+p.security+'</dd>' +
+      '</dl></div>';
+    host.appendChild(d);
+  });
+}
+function buildFallback(){
+  const host = $('#f2d');
+  CARD_PARTS.filter(p=>p.side==='front').forEach(p=>{
+    const b = document.createElement('button');
+    b.className='fhs'; b.type='button';
+    b.setAttribute('aria-label', p.title + ' — click to learn');
+    b.style.left = (((p.hotspot[0]+CARD_W/2)/CARD_W)*100) + '%';
+    b.style.top  = ((1-(p.hotspot[1]+CARD_H/2)/CARD_H)*100) + '%';
+    b.addEventListener('click', ()=>{
+      $('#panelKicker').textContent = p.category;
+      $('#panelTitle').textContent = p.title;
+      $('#panelSide').textContent = 'Front of the card · ' + p.short;
+      $('#panelFields').innerHTML = panelFields(p,'credit');
+      panel.classList.add('open');
+      if(window.innerWidth<=820) scrim.classList.add('on');
+    });
+    host.appendChild(b);
+  });
+}
+
+/* ===========================================================
+   WIRING
+   =========================================================== */
+function bindGoButtons(root){
+  $$('[data-go]', root||document).forEach(b=>{
+    if(b.__bound) return; b.__bound = true;
+    b.addEventListener('click', ()=> goScreen(b.dataset.go));
+  });
+}
+function wire(){
+  bindGoButtons();
+  $$('[data-act]').forEach(b=> b.addEventListener('click', ()=>{
+    const a = b.dataset.act;
+    if(a==='explore-credit'){ setCardType('credit'); goScreen('lab',{keepCard:true}); }
+    if(a==='explore-debit'){ setCardType('debit'); goScreen('lab',{keepCard:true}); }
+    if(a==='tour'){ setCardType(S.cardType); startTour(); }
+  }));
+  $$('[data-card]').forEach(b=> b.addEventListener('click', ()=>{
+    closePanel(); clearFocus(true);
+    setCardType(b.dataset.card);
+    applyModeLayout(false); resetCamera(700);
+  }));
+  $$('[data-side]').forEach(b=> b.addEventListener('click', ()=>{
+    if(S.focus && partById(S.focus.partId).side !== b.dataset.side){ clearFocus(true); closePanel(); }
+    setSide(b.dataset.side);
+    if(!S.focus) resetCamera(700);
+  }));
+  $$('[data-tool]').forEach(b=> b.addEventListener('click', ()=>{
+    const t = b.dataset.tool;
+    if(t==='spin'){ S.spin=!S.spin; b.setAttribute('aria-pressed',String(S.spin)); }
+    if(t==='zoomin') setCam({radius:clamp(cam.radius*0.78,1.1,16)},500);
+    if(t==='zoomout') setCam({radius:clamp(cam.radius*1.28,1.1,16)},500);
+    if(t==='flip'){ toggleFlip(); }
+    if(t==='explode'){
+      if(S.explodeOn){ setExplode(false); b.textContent='Exploded view'; }
+      else { setXray(false); setExplode(true); b.textContent='Reassemble card'; }
+    }
+    if(t==='xray'){ if(!S.xrayOn && S.explodeOn){ setExplode(false); $('[data-tool="explode"]').textContent='Exploded view'; } setXray(!S.xrayOn); }
+    if(t==='reset'){
+      S.spin=false; $('[data-tool="spin"]').setAttribute('aria-pressed','false');
+      setExplode(false); $('[data-tool="explode"]').textContent='Exploded view';
+      setXray(false); setSide('front'); closePanel(); clearFocus(true); resetCamera(800);
+    }
+    if(t==='tour') startTour();
+    if(t==='full'){
+      const el = document.documentElement;
+      if(!document.fullscreenElement){ (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el); b.textContent='Exit fullscreen'; }
+      else { document.exitFullscreen(); b.textContent='Fullscreen'; }
+    }
+  }));
+  $('#pClose').addEventListener('click', closePanel);
+  $('#pNext').addEventListener('click', ()=> stepPanel(1));
+  $('#pPrev').addEventListener('click', ()=> stepPanel(-1));
+  scrim.addEventListener('click', closePanel);
+  $('#tNext').addEventListener('click', ()=>{
+    if(S.tour.i >= tourList().length){ endTour(); return; }
+    S.tour.i++; showTourStep();
+  });
+  $('#tPrev').addEventListener('click', ()=>{ if(S.tour.i>0){ S.tour.i--; showTourStep(); } });
+  $('#tExit').addEventListener('click', ()=> endTour());
+  $('#quizStart').addEventListener('click', startQuiz);
+  $('#qNext').addEventListener('click', quizNext);
+  $('#qSkip').addEventListener('click', quizSkip);
+  $('#qExit').addEventListener('click', ()=>{ endQuiz(true); goScreen('quiz'); });
+  $('#qHint').addEventListener('click', ()=>{
+    const q = QUIZ[S.quiz.i];
+    $('#qFeed').className='q-feedback'; $('#qFeed').textContent = 'Hint: ' + q.hint;
+    if(q.side !== S.side) setSide(q.side);
+  });
+  $('#flowReplay').addEventListener('click', ()=>{ $('#flowInfo').classList.remove('show'); startFlowPulse(); });
+  document.addEventListener('fullscreenchange', ()=>{
+    const b = $('[data-tool="full"]'); if(b) b.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+  });
+}
+
+/* ===========================================================
+   BOOT
+   =========================================================== */
+function finishLoading(){
+  const fill = $('#loadFill'), note = $('#loadNote');
+  let p = 0;
+  const iv = setInterval(()=>{
+    p = Math.min(100, p + 16 + Math.random()*20);
+    fill.style.width = p + '%';
+    if(p>55) note.textContent = 'Lighting the studio…';
+    if(p>=100){
+      clearInterval(iv);
+      setTimeout(()=>{ $('#loader').classList.add('done'); }, 260);
+    }
+  }, 130);
+}
+
+function enable2D(){
+  $('#stage').style.display='none';
+  $('#hotspots').style.display='none';
+  $('#fallback').classList.add('on');
+  $('#home').classList.remove('active');
+  $$('.screen').forEach(s=>{ if(s.id==='home'||s.id==='lab') s.classList.remove('active'); });
+  $('#lab').classList.remove('active');
+  document.body.style.overflow='';
+  $('#loader').classList.add('done');
+  $$('.nav-links button[data-go="lab"]').forEach(b=>{
+    b.textContent='2D card';
+    b.addEventListener('click', e=>{
+      e.stopImmediatePropagation();
+      $('#fallback').classList.add('on');
+      $('#fallback').scrollIntoView({behavior:'smooth'});
+    }, true);
+  });
+}
+function boot(){
+  try{ bootMain(); }
+  catch(err){ console.error('CardLab 3D unavailable:', err); enable2D(); }
+}
+function bootMain(){
+  buildCompareTable(); buildSecurity(); buildTextVersion(); wire();
+  buildFlow(); buildFallback();
+
+  if(!webglOK()){
+    enable2D();
+    return;
+  }
+
+  initScene();
+  buildHotspots();
+  initControls();
+  setCardType('credit');
+  S.mode='home';
+  cam.radius = baseRadius(); cam.phi = Math.PI/2 - 0.06; cam.theta = -0.42;
+  setCam({ theta:0.0, phi:Math.PI/2-0.06, radius:baseRadius() }, 2200);
+  goScreen('home');
+  tick();
+  finishLoading();
+}
+
+if(document.fonts && document.fonts.ready){
+  document.fonts.ready.then(function(){ boot(); }, function(){ boot(); });
+} else {
+  window.addEventListener('load', boot);
+}
+})();
+</script>
+
+</body>
+</html>
